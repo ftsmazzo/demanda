@@ -54,3 +54,6 @@ uvicorn app.main:app --reload
 
 - Repositório mantido **público** por decisão do responsável em 2026-10-24. Os docs têm estratégia de produto e nome de cliente piloto: tornar privado antes de inserir dados reais ou novos clientes. Nunca commitar segredos nem mensagens reais.
 - Observabilidade (GlitchTip, Uptime Kuma) ainda não ligada.
+- Runtime deve usar `APP_DATABASE_URL` (login `demanda_runtime`, sem privilegios). `DATABASE_URL` (dono do schema) so para migrations e CLI; nunca usar o dono em runtime.
+- Sem rate limit no webhook (a cargo do proxy) e sem rotacao de segredo de canal.
+- Toda migration nova precisa dar GRANT ao papel `demanda_app` nas tabelas que criar.

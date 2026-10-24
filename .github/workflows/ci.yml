@@ -11,6 +11,22 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: demanda
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: demanda_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U demanda"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://demanda:ci-only-password@localhost:5432/demanda_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
