@@ -52,5 +52,5 @@ uvicorn app.main:app --reload
 
 ## Pendências de segurança abertas
 
-- Visibilidade do repositório (público ou privado) a decidir; os docs têm estratégia de produto e nome de cliente piloto.
+- Repositório mantido **público** por decisão do responsável em 2026-10-24. Os docs têm estratégia de produto e nome de cliente piloto: tornar privado antes de inserir dados reais ou novos clientes. Nunca commitar segredos nem mensagens reais.
 - Observabilidade (GlitchTip, Uptime Kuma) ainda não ligada.
