@@ -1,0 +1,56 @@
+# CLAUDE.md — Demanda
+
+Fonte única de regras do projeto para agentes e desenvolvedores. Documentos de referência: `docs/PRD.md`, `docs/TRD.md`, `docs/simulacao-tenant-teste.md`.
+
+## O que é
+
+Plataforma multi-tenant que escuta o WhatsApp do escritório (Evolution API, somente leitura), classifica mensagens (regras + IA) em demandas, tarefas e compromissos por setor, e tem um agente que fala só com os sócios (resumo diário, alertas). MVP definido no PRD v0.2: 3 papéis fixos, painel de perfis na fase 2.
+
+## Stack
+
+Python + FastAPI, PostgreSQL 16 com RLS, fila no Postgres, React no frontend, Claude para IA, deploy no EasyPanel. Backend em `backend/`, Dockerfile na raiz.
+
+## Princípios de arquitetura
+
+1. Gravar a mensagem bruta primeiro, processar depois. Idempotência por `(channel_id, provider_message_id)`.
+2. Canal de WhatsApp, LLM e envio do agente ficam atrás de adaptadores (`MessageSender` etc.).
+3. Números dos resumos vêm de SQL; a IA só classifica e redige.
+4. Multi-tenant: toda tabela de negócio tem `tenant_id` e política RLS. O app não usa superusuário do banco.
+5. Respostas curtas ("ok") em contato com demanda aberta anexam-se à demanda, nunca são descartadas.
+6. Simplicidade vence sofisticação: o que é da fase 2 não entra no MVP.
+
+## Checklist de segurança (verificar em todo PR)
+
+- [ ] Nenhum segredo no repositório; só `.env.example` com placeholders.
+- [ ] Toda consulta nova respeita `tenant_id` e RLS; há teste negativo de vazamento entre tenants.
+- [ ] Webhooks validam a origem (chave/segredo) antes de gravar.
+- [ ] Entrada de usuário validada com Pydantic; nada de SQL montado por concatenação.
+- [ ] Autorização por papel e escopo aplicada na API, não só na interface.
+- [ ] O que vai à IA é o mínimo necessário (texto e contexto curto).
+- [ ] Alterações de demanda, usuário e regra passam pela auditoria.
+
+## Fluxo de trabalho
+
+- Trabalho rastreado em Issues do GitHub; uma branch por tarefa; PR pequeno para `main`.
+- TDD no backend: teste primeiro, depois implementação.
+- Revisão de código antes de mergear (`/ecc:code-review`).
+- Decisões estruturais viram ADR em `docs/` (ver seção 8 do TRD).
+
+## Esteira de qualidade (Python)
+
+Ruff (lint e formato), pytest, e a CI do GitHub Actions (`.github/workflows/ci.yml`) rodam a cada PR. Adicionar tipos (mypy ou pyright) e detecção de código morto (vulture) quando houver código de negócio.
+
+## Comandos
+
+```bash
+cd backend
+pip install -r requirements-dev.txt
+pytest
+ruff check . && ruff format --check .
+uvicorn app.main:app --reload
+```
+
+## Pendências de segurança abertas
+
+- Visibilidade do repositório (público ou privado) a decidir; os docs têm estratégia de produto e nome de cliente piloto.
+- Observabilidade (GlitchTip, Uptime Kuma) ainda não ligada.
