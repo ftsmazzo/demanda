@@ -22,12 +22,41 @@ def _build_parser() -> argparse.ArgumentParser:
         help="cria o login de runtime; a senha vem da variavel APP_DB_PASSWORD",
     )
 
+    sub.add_parser("stats", help="contagem de mensagens e latencia por canal (medicao do spike)")
+
     channel = sub.add_parser("create-channel", help="cria um canal e mostra o segredo uma vez")
     channel.add_argument("--tenant-slug", required=True)
     channel.add_argument("--name", required=True)
     channel.add_argument("--instance", required=True, help="nome da instancia na Evolution")
     channel.add_argument("--listen-groups", action="store_true")
     return parser
+
+
+_STATS_SQL = """
+    SELECT c.id, c.name,
+           count(m.id),
+           count(m.id) FILTER (WHERE m.direction = 'in'),
+           count(m.id) FILTER (WHERE m.direction = 'out'),
+           max(m.received_at),
+           avg(extract(epoch FROM m.received_at - m.provider_timestamp)),
+           percentile_cont(0.95) WITHIN GROUP (
+               ORDER BY extract(epoch FROM m.received_at - m.provider_timestamp))
+    FROM channels c LEFT JOIN messages m ON m.channel_id = c.id
+    GROUP BY c.id, c.name ORDER BY c.name
+"""
+
+
+def _fmt(value: float | None) -> str:
+    return "-" if value is None else f"{value:.1f}"
+
+
+def _print_stats(conn: psycopg.Connection) -> int:
+    for cid, name, total, inbound, outbound, last, avg_lat, p95 in conn.execute(_STATS_SQL):
+        print(
+            f"{cid} {name}: total={total} in={inbound} out={outbound} "
+            f"ultima={last} latencia_media_s={_fmt(avg_lat)} latencia_p95_s={_fmt(p95)}"
+        )
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -42,6 +71,9 @@ def main(argv: list[str] | None = None) -> int:
             tenant_id = create_tenant(conn, slug=args.slug, name=args.name)
             print(f"tenant criado: {tenant_id}")
             return 0
+
+        if args.command == "stats":
+            return _print_stats(conn)
 
         if args.command == "create-runtime-role":
             password = os.environ.get("APP_DB_PASSWORD")

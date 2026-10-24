@@ -43,3 +43,29 @@ def test_missing_database_url_is_an_error(monkeypatch, capsys):
 def test_unknown_command_exits_with_usage_error():
     with pytest.raises(SystemExit):
         cli.main(["nope"])
+
+
+def test_stats_reports_counts_and_latency_per_channel(
+    admin_url, admin_conn, channel, monkeypatch, capsys
+):
+    from datetime import UTC, datetime, timedelta
+
+    monkeypatch.setenv("DATABASE_URL", admin_url)
+    sent_at = datetime.now(UTC) - timedelta(seconds=2)
+    for message_id, direction in (("S1", "in"), ("S2", "out")):
+        admin_conn.execute(
+            "INSERT INTO messages (tenant_id, channel_id, provider_message_id, direction, "
+            "remote_jid, contact_phone, message_type, provider_timestamp, raw) "
+            "VALUES (%s, %s, %s, %s, 'x@s.whatsapp.net', '5511', 'conversation', %s, '{}')",
+            (channel.tenant_id, channel.channel_id, message_id, direction, sent_at),
+        )
+
+    code = cli.main(["stats"])
+
+    out = capsys.readouterr().out
+    assert code == 0
+    line = next(row for row in out.splitlines() if str(channel.channel_id) in row)
+    assert "total=2" in line
+    assert "in=1" in line
+    assert "out=1" in line
+    assert "latencia_media_s=" in line

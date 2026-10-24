@@ -23,6 +23,8 @@ Objetivo: receber mensagens reais pelo webhook da Evolution, gravar no Postgres 
 
 ## Como ligar a Evolution
 
+A Evolution da Fabrica roda em `https://infra-core-whatsapp-core.kxryyk.easypanel.host` (painel em `/manager`). Use uma instancia propria para o Demanda; nao reaproveite a de outro projeto.
+
 1. Com as variaveis acima definidas e o servico reimplantado, crie o tenant e o canal no console do servico `api` (EasyPanel). O segredo aparece uma unica vez:
 
 ```bash
@@ -35,7 +37,13 @@ python -m app.cli create-channel --tenant-slug contabilidade-piloto --name "What
    - Evento: `MESSAGES_UPSERT`
    - Cabecalho: `X-Webhook-Secret: <segredo>`
    - Deixe desligada a opcao de enviar midia em base64 no webhook.
-3. Envie uma mensagem de teste e confira em `messages`.
+3. Envie uma mensagem de teste e confira no console do servico `api`:
+
+```bash
+python -m app.cli stats
+```
+
+   Mostra, por canal, total, recebidas, enviadas, ultima mensagem e latencia (media e p95).
 
 ## Como medir (criterios do spike)
 
