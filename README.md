@@ -31,6 +31,18 @@ ruff check .
 ruff format --check .
 ```
 
+Interface web:
+
+```bash
+cd frontend
+npm ci
+npm run dev       # servidor de desenvolvimento
+npm test          # Vitest
+npm run build     # tsc + vite build
+```
+
+Para ver a interface com dados ficticios: `python backend/dev/demo_server.py` (depois de `npm run build`), login `carlos@demo.com`, tenant `demo`.
+
 ## Deploy
 
 Imagem a partir do `Dockerfile` na raiz (porta 8000, healthcheck em `/health`), pensada para o EasyPanel com serviços isolados (app, worker, banco, Evolution). Variáveis em `.env.example`.

@@ -8,3 +8,7 @@ docs
 backend/tests
 .env
 .env.*
+design
+**/node_modules
+frontend/dist
+backend/dev

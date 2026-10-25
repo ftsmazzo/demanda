@@ -76,7 +76,7 @@ curl -s https://demanda-api.kxryyk.easypanel.host/api/v1/board -H 'Authorization
 
 ## Limitacoes conhecidas
 
-- Nao ha interface web ainda; esta e so a API.
+- A interface web (`frontend/`) e servida pela propria API a partir de `STATIC_DIR` (a imagem Docker ja a embute em `/app/static`). Mesma origem, sem CORS.
 - Login: 5 falhas por conta bloqueiam por 10 minutos (em memoria, por processo); nao ha limite por IP. Convem limitar no proxy.
 - Paginacao por `offset` (a ordem muda quando ha movimentacao); o quadro faz uma consulta por coluna, suficiente para o volume do piloto.
 - Nao ha trilha de auditoria nem revogacao de token (a desativacao do usuario vale na hora, porque o usuario e relido a cada requisicao).

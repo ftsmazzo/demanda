@@ -44,7 +44,7 @@ function LoadLine({ row, scale }: { row: LoadRow; scale: number }) {
   const label = `${row.name}: ${row.total} ${row.total === 1 ? "demanda aberta" : "demandas abertas"}`;
   return (
     <div className="load">
-      <span>{row.name.split(" ")[0]}</span>
+      <span>{row.id === null ? row.name : row.name.split(" ")[0]}</span>
       <span className="load-bar" role="img" aria-label={label}>
         {SEGMENTS.map(({ status, color }) => (
           <i key={status} style={{ width: `${(100 * row.byStatus[status]) / scale}%`, background: color }} />

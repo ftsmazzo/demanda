@@ -8,7 +8,7 @@ Plataforma multi-tenant que escuta o WhatsApp do escritório (Evolution API, som
 
 ## Stack
 
-Python + FastAPI, PostgreSQL 16 com RLS, fila no Postgres, React no frontend, Claude para IA, deploy no EasyPanel. Backend em `backend/`, Dockerfile na raiz.
+Python + FastAPI, PostgreSQL 16 com RLS, fila no Postgres, React no frontend, Claude para IA, deploy no EasyPanel. Backend em `backend/`, interface em `frontend/` (Vite, React 18, TypeScript, Vitest, TanStack Query, dnd-kit), Dockerfile multi-estagio na raiz (o build do frontend vai para `/app/static` e a API o serve).
 
 ## Princípios de arquitetura
 
