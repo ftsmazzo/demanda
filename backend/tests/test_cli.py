@@ -123,3 +123,61 @@ def test_classify_pending_refuses_to_run_without_the_restricted_runtime_url(
 def test_classify_pending_limit_must_be_between_1_and_1000(limit):
     with pytest.raises(SystemExit):
         cli.main(["classify-pending", "--limit", limit])
+
+
+def test_review_lists_classified_messages_and_can_filter_the_ones_needing_review(
+    admin_url, admin_conn, channel, monkeypatch, capsys
+):
+    from app.classification.store import classify_pending
+    from app.db import Database
+    from tests.test_classification_store import add_message
+
+    monkeypatch.setenv("DATABASE_URL", admin_url)
+    add_message(admin_conn, channel, "R1", "Quando vence o DAS esse mes?", minutes=200000)
+    add_message(admin_conn, channel, "R2", "Pode me ajudar com uma coisa aqui?", minutes=200001)
+    db = Database(admin_url)
+    db.open()
+    try:
+        classify_pending(db, channel.tenant_id)
+    finally:
+        db.close()
+
+    assert cli.main(["review"]) == 0
+    everything = capsys.readouterr().out
+    assert "Quando vence o DAS" in everything
+    assert "Pode me ajudar" in everything
+    assert "fiscal/duvida/normal" in everything
+
+    assert cli.main(["review", "--needs-review"]) == 0
+    only_review = capsys.readouterr().out
+    assert "Pode me ajudar" in only_review
+    assert "Quando vence o DAS" not in only_review
+    assert "no_llm" in only_review
+
+
+def test_review_hides_most_of_the_phone_number(admin_url, admin_conn, channel, monkeypatch, capsys):
+    from app.classification.store import classify_pending
+    from app.db import Database
+    from tests.test_classification_store import add_message
+
+    monkeypatch.setenv("DATABASE_URL", admin_url)
+    add_message(
+        admin_conn,
+        channel,
+        "R3",
+        "Quando vence o DAS esse mes?",
+        phone="5511987654321",
+        minutes=300000,
+    )
+    db = Database(admin_url)
+    db.open()
+    try:
+        classify_pending(db, channel.tenant_id)
+    finally:
+        db.close()
+
+    cli.main(["review"])
+
+    out = capsys.readouterr().out
+    assert "987654321" not in out
+    assert "4321" in out

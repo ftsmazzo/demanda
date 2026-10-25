@@ -35,6 +35,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     classify.add_argument("--no-llm", action="store_true", help="so regras, sem chamar a IA")
 
+    review = sub.add_parser("review", help="lista as ultimas mensagens classificadas")
+    review.add_argument("--limit", type=_review_limit, default=30, help="quantidade (1 a 200)")
+    review.add_argument(
+        "--needs-review", action="store_true", help="so as que pedem revisao humana"
+    )
+
     sub.add_parser("stats", help="contagem de mensagens e latencia por canal (medicao do spike)")
 
     channel = sub.add_parser("create-channel", help="cria um canal e mostra o segredo uma vez")
@@ -69,6 +75,36 @@ def _print_stats(conn: psycopg.Connection) -> int:
             f"{cid} {name}: total={total} in={inbound} out={outbound} "
             f"ultima={last} latencia_media_s={_fmt(avg_lat)} latencia_p95_s={_fmt(p95)}"
         )
+    return 0
+
+
+_REVIEW_SQL = """
+    SELECT m.provider_timestamp, m.contact_phone, m.text, c.sector, c.kind, c.urgency,
+           c.source, c.needs_review, c.reason, c.action
+    FROM message_classifications c JOIN messages m ON m.id = c.message_id
+    WHERE (NOT %s OR c.needs_review)
+    ORDER BY m.provider_timestamp DESC
+    LIMIT %s
+"""
+_REVIEW_TEXT_CHARS = 90
+
+
+def _review_limit(value: str) -> int:
+    number = int(value)
+    if not 1 <= number <= 200:
+        raise argparse.ArgumentTypeError("deve estar entre 1 e 200")
+    return number
+
+
+def _print_review(conn: psycopg.Connection, limit: int, *, only_review: bool) -> int:
+    rows = conn.execute(_REVIEW_SQL, (only_review, limit)).fetchall()
+    for sent_at, phone, text, sector, kind, urgency, source, needs_review, reason, action in rows:
+        snippet = " ".join((text or "(sem texto)").split())[:_REVIEW_TEXT_CHARS]
+        label = action if action != "classified" else f"{sector}/{kind}/{urgency}"
+        flag = f" [revisar: {reason}]" if needs_review else ""
+        print(f"{sent_at:%Y-%m-%d %H:%M} ...{phone[-4:]} | {label} | {source}{flag} | {snippet}")
+    if not rows:
+        print("nada para mostrar")
     return 0
 
 
@@ -130,6 +166,9 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "classify-pending":
             return _classify_pending(conn, args.limit, use_llm=not args.no_llm)
+
+        if args.command == "review":
+            return _print_review(conn, args.limit, only_review=args.needs_review)
 
         if args.command == "stats":
             return _print_stats(conn)

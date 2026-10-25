@@ -24,6 +24,16 @@ Precisa de `APP_DATABASE_URL` (o login restrito). Rode uma execucao por vez.
 
 Para ligar a IA: no EasyPanel, servico `api`, adicione a variavel `ANTHROPIC_API_KEY` e reimplante.
 
+## Revisar o resultado
+
+```bash
+python -m app.cli review                  # ultimas 30 classificadas
+python -m app.cli review --needs-review   # so as que pedem revisao humana
+python -m app.cli review --limit 100      # ate 200
+```
+
+Cada linha: data, final do telefone, `setor/tipo/urgencia` (ou `noise`/`attach_reply`), origem (`rule`, `llm` ou `fallback`) e o inicio do texto.
+
 ## Medir
 
 ```bash
