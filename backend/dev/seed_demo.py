@@ -20,20 +20,195 @@ USERS = [
 
 # (titulo, contato, final do telefone, setor, urgencia, status, horas paradas, responsavel, etapas)
 DEMANDS = [
-    ("Já pedi 3 vezes a certidão negativa, ninguém me responde", "Clínica Vida", "9106", "societario", "critica", "novo", 26, "juliana", [("Localizar o pedido anterior", False), ("Emitir a certidão", False), ("Responder ao cliente", False)]),
-    ("Quando vence o DAS de outubro?", "Oficina do Zé", "0103", "fiscal", "normal", "novo", 52, None, []),
-    ("Notas fiscais de outubro para fechar o mês", "Padaria Pão Quente", "0101", "fiscal", "normal", "novo", 4, "bruno", [("Receber as 12 notas", True), ("Conferir valores", False), ("Lançar", False), ("Confirmar com o cliente", False)]),
-    ("Boleto da internet vence dia 10", "NetFibra", "0105", "financeiro", "normal", "novo", 2, None, []),
-    ("Pedido de folga no dia 30", "Ana Paula", "0104", "rh-interno", "normal", "novo", 6, "aline", []),
-    ("Abertura da filial do Mercado Bom Preço", "Mercado Bom Preço", "0102", "societario", "alta", "em_andamento", 20, "juliana", [("Contrato social", True), ("Consulta de viabilidade", True), ("Inscrição estadual", False), ("Alvará", False), ("CNPJ da filial", False)]),
-    ("Rescisão do funcionário João", "Autopeças Silva", "0107", "dp", "alta", "em_andamento", 8, "marcos", [("Dados do desligamento", True), ("Cálculo", True), ("Conferência", True), ("Envio ao cliente", False)]),
-    ("Balancete de setembro", "Grupo Alvorada", "0108", "contabil", "normal", "em_andamento", 31, "patricia", [("Extrato", True), ("Lançamentos", True), ("Conciliação", True), ("Revisão", True), ("Assinatura", True), ("Envio", False), ("Arquivo", False)]),
-    ("Guia do Simples de outubro", "Mercearia do Vale", "0109", "fiscal", "alta", "em_andamento", 3, "rafael", [("Apurar", True), ("Emitir a guia", False)]),
-    ("Reunião sobre a filial na quinta, às 15h", "Mercado Bom Preço", "0102", "societario", "normal", "aguardando", 70, "juliana", [("Confirmação do cliente", False)]),
-    ("Conciliação bancária de outubro", "Grupo Alvorada", "0108", "contabil", "normal", "aguardando", 98, "patricia", [("Extrato recebido", True), ("Importar", True), ("Conferir", False), ("Pendências", False), ("Fechar", False), ("Enviar", False)]),
-    ("Cálculo do 13º salário", "Autopeças Silva", "0107", "dp", "normal", "aguardando", 28, "marcos", [("Folha base", True), ("Médias", False), ("Conferência", False)]),
-    ("Alvará da loja renovado", "Calçados Lima", "0110", "societario", "normal", "concluido", 0, "juliana", [("Protocolo", True), ("Retirada", True), ("Entrega", True)]),
-    ("DAS de setembro emitido", "Oficina do Zé", "0103", "fiscal", "normal", "concluido", 0, "bruno", [("Apurar", True), ("Emitir", True)]),
+    (
+        "Já pedi 3 vezes a certidão negativa, ninguém me responde",
+        "Clínica Vida",
+        "9106",
+        "societario",
+        "critica",
+        "novo",
+        26,
+        "juliana",
+        [
+            ("Localizar o pedido anterior", False),
+            ("Emitir a certidão", False),
+            ("Responder ao cliente", False),
+        ],
+    ),
+    (
+        "Quando vence o DAS de outubro?",
+        "Oficina do Zé",
+        "0103",
+        "fiscal",
+        "normal",
+        "novo",
+        52,
+        None,
+        [],
+    ),
+    (
+        "Notas fiscais de outubro para fechar o mês",
+        "Padaria Pão Quente",
+        "0101",
+        "fiscal",
+        "normal",
+        "novo",
+        4,
+        "bruno",
+        [
+            ("Receber as 12 notas", True),
+            ("Conferir valores", False),
+            ("Lançar", False),
+            ("Confirmar com o cliente", False),
+        ],
+    ),
+    (
+        "Boleto da internet vence dia 10",
+        "NetFibra",
+        "0105",
+        "financeiro",
+        "normal",
+        "novo",
+        2,
+        None,
+        [],
+    ),
+    (
+        "Pedido de folga no dia 30",
+        "Ana Paula",
+        "0104",
+        "rh-interno",
+        "normal",
+        "novo",
+        6,
+        "aline",
+        [],
+    ),
+    (
+        "Abertura da filial do Mercado Bom Preço",
+        "Mercado Bom Preço",
+        "0102",
+        "societario",
+        "alta",
+        "em_andamento",
+        20,
+        "juliana",
+        [
+            ("Contrato social", True),
+            ("Consulta de viabilidade", True),
+            ("Inscrição estadual", False),
+            ("Alvará", False),
+            ("CNPJ da filial", False),
+        ],
+    ),
+    (
+        "Rescisão do funcionário João",
+        "Autopeças Silva",
+        "0107",
+        "dp",
+        "alta",
+        "em_andamento",
+        8,
+        "marcos",
+        [
+            ("Dados do desligamento", True),
+            ("Cálculo", True),
+            ("Conferência", True),
+            ("Envio ao cliente", False),
+        ],
+    ),
+    (
+        "Balancete de setembro",
+        "Grupo Alvorada",
+        "0108",
+        "contabil",
+        "normal",
+        "em_andamento",
+        31,
+        "patricia",
+        [
+            ("Extrato", True),
+            ("Lançamentos", True),
+            ("Conciliação", True),
+            ("Revisão", True),
+            ("Assinatura", True),
+            ("Envio", False),
+            ("Arquivo", False),
+        ],
+    ),
+    (
+        "Guia do Simples de outubro",
+        "Mercearia do Vale",
+        "0109",
+        "fiscal",
+        "alta",
+        "em_andamento",
+        3,
+        "rafael",
+        [("Apurar", True), ("Emitir a guia", False)],
+    ),
+    (
+        "Reunião sobre a filial na quinta, às 15h",
+        "Mercado Bom Preço",
+        "0102",
+        "societario",
+        "normal",
+        "aguardando",
+        70,
+        "juliana",
+        [("Confirmação do cliente", False)],
+    ),
+    (
+        "Conciliação bancária de outubro",
+        "Grupo Alvorada",
+        "0108",
+        "contabil",
+        "normal",
+        "aguardando",
+        98,
+        "patricia",
+        [
+            ("Extrato recebido", True),
+            ("Importar", True),
+            ("Conferir", False),
+            ("Pendências", False),
+            ("Fechar", False),
+            ("Enviar", False),
+        ],
+    ),
+    (
+        "Cálculo do 13º salário",
+        "Autopeças Silva",
+        "0107",
+        "dp",
+        "normal",
+        "aguardando",
+        28,
+        "marcos",
+        [("Folha base", True), ("Médias", False), ("Conferência", False)],
+    ),
+    (
+        "Alvará da loja renovado",
+        "Calçados Lima",
+        "0110",
+        "societario",
+        "normal",
+        "concluido",
+        0,
+        "juliana",
+        [("Protocolo", True), ("Retirada", True), ("Entrega", True)],
+    ),
+    (
+        "DAS de setembro emitido",
+        "Oficina do Zé",
+        "0103",
+        "fiscal",
+        "normal",
+        "concluido",
+        0,
+        "bruno",
+        [("Apurar", True), ("Emitir", True)],
+    ),
 ]
 
 CONVERSATIONS = {
@@ -54,10 +229,20 @@ def seed(conn: psycopg.Connection) -> dict[str, str]:
     channel, _ = create_channel(conn, tenant_id=tenant, name="WhatsApp", instance_name="demo")
     ids = {}
     for key, name, email, role, sectors in USERS:
-        ids[key] = create_user(conn, tenant_id=tenant, email=email, name=name, role=role, password=PASSWORD, sectors=sectors)
+        ids[key] = create_user(
+            conn,
+            tenant_id=tenant,
+            email=email,
+            name=name,
+            role=role,
+            password=PASSWORD,
+            sectors=sectors,
+        )
 
     contacts: dict[str, object] = {}
-    for index, (title, who, tail, sector, urgency, status, idle, owner, steps) in enumerate(DEMANDS):
+    for index, (title, who, tail, sector, urgency, status, idle, owner, steps) in enumerate(
+        DEMANDS
+    ):
         if who not in contacts:
             contacts[who] = conn.execute(
                 "INSERT INTO contacts (tenant_id, phone, name, kind) VALUES (%s, %s, %s, 'cliente') RETURNING id",
@@ -70,13 +255,31 @@ def seed(conn: psycopg.Connection) -> dict[str, str]:
             (tenant, contacts[who], sector, urgency, status, title, ids.get(owner), idle),
         ).fetchone()[0]
         for label, done in steps:
-            conn.execute("INSERT INTO subtasks (tenant_id, demand_id, title, done) VALUES (%s, %s, %s, %s)", (tenant, demand, label, done))
-        for number, (direction, text, minutes_ago) in enumerate(CONVERSATIONS.get(title, [("in", title, idle * 60 + 5)])):
+            conn.execute(
+                "INSERT INTO subtasks (tenant_id, demand_id, title, done) VALUES (%s, %s, %s, %s)",
+                (tenant, demand, label, done),
+            )
+        for number, (direction, text, minutes_ago) in enumerate(
+            CONVERSATIONS.get(title, [("in", title, idle * 60 + 5)])
+        ):
             message = conn.execute(
                 "INSERT INTO messages (tenant_id, channel_id, provider_message_id, direction, remote_jid, contact_phone, "
                 "message_type, text, provider_timestamp, raw, contact_id) VALUES (%s, %s, %s, %s, %s, %s, 'conversation', %s, "
                 "now() - make_interval(mins => %s), '{}'::jsonb, %s) RETURNING id",
-                (tenant, channel, f"demo-{index}-{number}", direction, f"55119999{tail}@s.whatsapp.net", f"55119999{tail}", text, minutes_ago, contacts[who]),
+                (
+                    tenant,
+                    channel,
+                    f"demo-{index}-{number}",
+                    direction,
+                    f"55119999{tail}@s.whatsapp.net",
+                    f"55119999{tail}",
+                    text,
+                    minutes_ago,
+                    contacts[who],
+                ),
             ).fetchone()[0]
-            conn.execute("INSERT INTO demand_messages (tenant_id, demand_id, message_id) VALUES (%s, %s, %s)", (tenant, demand, message))
+            conn.execute(
+                "INSERT INTO demand_messages (tenant_id, demand_id, message_id) VALUES (%s, %s, %s)",
+                (tenant, demand, message),
+            )
     return {"tenant": TENANT_SLUG, "password": PASSWORD}

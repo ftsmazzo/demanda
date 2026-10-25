@@ -15,10 +15,10 @@ sys.path.insert(0, str(BACKEND / "dev"))
 import pgserver  # noqa: E402
 import psycopg  # noqa: E402
 import uvicorn  # noqa: E402
+from seed_demo import PASSWORD, TENANT_SLUG, seed  # noqa: E402
 
 from app.main import create_app  # noqa: E402
 from app.migrate import apply_migrations  # noqa: E402
-from seed_demo import PASSWORD, TENANT_SLUG, seed  # noqa: E402
 
 PORT = int(os.environ.get("PORT", "8000"))
 SECRET = "segredo-so-para-demonstracao-local-0123456789"
@@ -32,8 +32,12 @@ def main() -> None:
         seed(conn)
     dist = BACKEND.parent / "frontend" / "dist"
     app = create_app(database_url=url, jwt_secret=SECRET, static_dir=dist)
-    print(f"\nDemonstracao em http://localhost:{PORT}  |  empresa: {TENANT_SLUG}  |  senha: {PASSWORD}")
-    print("usuarios: carlos@demo.com (socio), rafael@demo.com (gestor), bruno@demo.com (colaborador)\n")
+    print(
+        f"\nDemonstracao em http://localhost:{PORT}  |  empresa: {TENANT_SLUG}  |  senha: {PASSWORD}"
+    )
+    print(
+        "usuarios: carlos@demo.com (socio), rafael@demo.com (gestor), bruno@demo.com (colaborador)\n"
+    )
     try:
         uvicorn.run(app, host="127.0.0.1", port=PORT, log_level="warning")
     finally:
