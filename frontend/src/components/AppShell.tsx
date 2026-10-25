@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { NavLink, Navigate, Outlet, useOutletContext } from "react-router-dom";
+import { NavLink, Navigate, Outlet, useOutletContext, useSearchParams } from "react-router-dom";
 import { useAuth, useMe } from "../auth/AuthContext";
 import type { Me, Role } from "../api/types";
+import { DemandDrawer } from "../features/demand/DemandDrawer";
 import { initials } from "../lib/format";
 import { Icon, type IconName } from "./Icon";
 import { Mark } from "./Mark";
@@ -63,6 +64,18 @@ function UserMenu({ me }: { me: Me }) {
   );
 }
 
+function DemandDrawerHost({ me }: { me: Me }) {
+  const [params, setParams] = useSearchParams();
+  const id = params.get("demanda");
+  if (!id) return null;
+  const close = () => {
+    const next = new URLSearchParams(params);
+    next.delete("demanda");
+    setParams(next);
+  };
+  return <DemandDrawer key={id} id={id} me={me} onClose={close} />;
+}
+
 export function AppShell() {
   const me = useMe();
 
@@ -109,6 +122,7 @@ export function AppShell() {
       <main className="main">
         <Outlet context={user} />
       </main>
+      <DemandDrawerHost me={user} />
     </div>
   );
 }

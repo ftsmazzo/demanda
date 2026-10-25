@@ -52,3 +52,21 @@ export function initials(name: string): string {
   const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
   return (parts[0][0] + last).toUpperCase();
 }
+
+const MESSAGE_TIME = new Intl.DateTimeFormat("pt-BR", {
+  day: "2-digit",
+  month: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+export function formatMessageTime(iso: string): string {
+  return MESSAGE_TIME.format(new Date(iso)).replace(",", "");
+}
+
+/** Frase sobre o tempo da demanda, para o subtitulo da gaveta. */
+export function idleSentence(card: Pick<Card, "status" | "idle_hours" | "closed_at">): string {
+  if (card.status === "concluido") return idleBadge(card);
+  if (card.idle_hours < 1) return "Movimentada agora";
+  return `Parada há ${spanText(card.idle_hours)}`;
+}

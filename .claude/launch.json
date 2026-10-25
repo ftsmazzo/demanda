@@ -4,8 +4,22 @@
     {
       "name": "prototipo-demanda",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "5173", "--directory", "design/prototype"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "5173",
+        "--directory",
+        "design/prototype"
+      ],
       "port": 5173
+    },
+    {
+      "name": "demanda-demo",
+      "runtimeExecutable": "backend/.venv/Scripts/python.exe",
+      "runtimeArgs": [
+        "backend/dev/demo_server.py"
+      ],
+      "port": 8000
     }
   ]
 }

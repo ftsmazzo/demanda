@@ -2,6 +2,7 @@ import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import psycopg
 from fastapi import FastAPI, HTTPException, Request
@@ -18,6 +19,7 @@ from app.limits import BodyLimitMiddleware
 from app.migrate import apply_migrations
 from app.provisioning import create_runtime_role
 from app.security.throttle import LoginThrottle
+from app.spa import mount_spa
 from app.webhooks import router as webhooks_router
 
 logger = logging.getLogger(__name__)
@@ -37,6 +39,7 @@ def create_app(
     runtime_password: str | None = None,
     jwt_secret: str | None = None,
     token_ttl_seconds: int = DEFAULT_TOKEN_TTL_SECONDS,
+    static_dir: str | Path | None = None,
 ) -> FastAPI:
     """database_url: conexao de runtime. admin_url: dono do schema, so para migrations."""
     db = Database(database_url, app_role=app_role, max_size=pool_max) if database_url else None
@@ -89,6 +92,7 @@ def create_app(
             raise HTTPException(status_code=503, detail="database unavailable")
         return {"status": "ok"}
 
+    mount_spa(app, static_dir)  # por ultimo: a SPA so pega o que nenhuma rota do backend pegou
     return app
 
 
@@ -101,6 +105,7 @@ app = create_app(
     pool_max=int(os.environ.get("DB_POOL_MAX", "5")),
     max_body_bytes=int(os.environ.get("MAX_BODY_BYTES", str(DEFAULT_MAX_BODY_BYTES))),
     runtime_password=os.environ.get("APP_DB_PASSWORD"),
+    static_dir=os.environ.get("STATIC_DIR"),
     jwt_secret=os.environ.get("JWT_SECRET") or None,
     token_ttl_seconds=int(os.environ.get("TOKEN_TTL_MINUTES", "480")) * 60,
 )

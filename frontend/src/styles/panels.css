@@ -11,16 +11,24 @@
   background: var(--surface);
   border-left: 1px solid var(--rule-strong);
   box-shadow: -18px 0 40px -28px rgba(10, 25, 20, 0.35);
-  transform: translateX(104%);
-  visibility: hidden;
-  transition-property: transform, visibility;
-  transition-duration: 260ms;
-  transition-timing-function: var(--ease);
+  animation: drawer-in 260ms var(--ease) both;
 }
 
-.drawer[data-open="true"] {
-  transform: none;
-  visibility: visible;
+@keyframes drawer-in {
+  from {
+    transform: translateX(40px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawer {
+    animation: none;
+  }
 }
 
 .drawer-head {
@@ -335,4 +343,43 @@
   margin-right: 6px;
   border-radius: 2px;
   background: var(--c);
+}
+
+.plain {
+  font-weight: 560;
+}
+
+.media {
+  color: var(--ink-3);
+}
+
+.input-compact {
+  height: 36px;
+  font-size: 14px;
+}
+
+.add-step {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.add-step .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.input-date {
+  height: 32px;
+  padding: 0 8px;
+  margin-left: -8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-m);
+  background: transparent;
+  font-weight: 560;
+}
+
+.input-date:hover {
+  border-color: var(--rule-strong);
+  background: var(--paper);
 }

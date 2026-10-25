@@ -305,3 +305,38 @@
     animation: none;
   }
 }
+
+/* o tempo parado nunca quebra no meio; a linha de tags pode descer */
+.card-meta {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+
+.card-tags {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+
+.idle {
+  white-space: nowrap;
+}
+
+.lane-done .card-meta {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* telas medias: 2 x 2 em vez de espremer a quarta coluna */
+@media (max-width: 1180px) and (min-width: 901px) {
+  .board {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .lane:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .lane:nth-child(n + 3) {
+    border-top: 1px solid var(--rule);
+  }
+}
