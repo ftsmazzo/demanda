@@ -5,7 +5,7 @@ Objetivo: transformar cada mensagem recebida em setor, tipo, urgencia e cliente,
 ## Como funciona
 
 1. **Regras primeiro** (`app/classification/rules.py`, versao `contabilidade-v1.2`): palavras e frases do dominio, sem custo. Quando acham setor e tipo, decidem sozinhas (confianca 0.9) e a IA nao e chamada.
-2. **IA so no que sobra** (`llm.py`): Claude Haiku 5.5 (modelo trocavel por `CLASSIFIER_MODEL`), saida em JSON com schema fixo e validacao estrita. O texto da mensagem vai como dado delimitado: sem colchetes angulares, com CPF/CNPJ/numeros longos mascarados e limitado a 2000 caracteres. Mensagens anteriores da mesma conversa (ate 5) vao junto, tambem como dado.
+2. **IA so no que sobra**: Claude Haiku 5.5 por **OpenRouter** (`anthropic/claude-haiku-5.5`) ou pela API da Anthropic, escolhido pela chave definida; saida em JSON com schema fixo e validacao estrita. O texto da mensagem vai como dado delimitado: sem colchetes angulares, com CPF/CNPJ/numeros longos mascarados e limitado a 2000 caracteres. Mensagens anteriores da mesma conversa (ate 5) vao junto, tambem como dado.
 3. **Fallback que nunca perde mensagem**: IA fora do ar, resposta invalida, erro inesperado, texto vazio ou confianca abaixo de 0.6 resultam em `source=fallback`, `needs_review=true`, setor triagem (ou o que as regras acharam).
 4. **Ruido e respostas curtas**: agradecimentos, saudacoes e pontuacao viram `noise`. "ok", "pode ser" e "fechado" com demanda aberta viram `attach_reply` (nunca sao descartados).
 5. Cada resultado fica em `message_classifications` (RLS por tenant, historico append-only, versao das regras e modelo registrados).
@@ -22,7 +22,16 @@ python -m app.cli classify-pending --limit 50    # limite por tenant (1 a 1000)
 
 Precisa de `APP_DATABASE_URL` (o login restrito). Rode uma execucao por vez.
 
-Para ligar a IA: no EasyPanel, servico `api`, adicione a variavel `ANTHROPIC_API_KEY` e reimplante.
+Para ligar a IA, no EasyPanel (servico `api`) adicione `OPENROUTER_API_KEY` (ou `ANTHROPIC_API_KEY`) e reimplante.
+
+| Variavel | Efeito |
+|---|---|
+| `OPENROUTER_API_KEY` | usa a OpenRouter (tem prioridade) |
+| `ANTHROPIC_API_KEY` | usa a API da Anthropic, se nao houver chave da OpenRouter |
+| `CLASSIFIER_PROVIDER` | `openrouter`, `anthropic` ou `none` forca a escolha |
+| `CLASSIFIER_MODEL` | troca o modelo (ex.: `google/gemini-2.5-flash` na OpenRouter) |
+
+Se a IA estiver fora do ar ou a chave for invalida, as mensagens ficam **pendentes** (`deferred=N` na saida) e a proxima execucao tenta de novo; nada e gravado como definitivo por falha temporaria.
 
 ## Revisar o resultado
 
@@ -38,7 +47,7 @@ Cada linha: data, final do telefone, `setor/tipo/urgencia` (ou `noise`/`attach_r
 
 ```bash
 python -m app.classification.evaluation --errors         # so regras
-python -m app.classification.evaluation --llm --errors   # com IA (chamadas reais, custo)
+OPENROUTER_API_KEY=<chave> python -m app.classification.evaluation --llm --errors   # com IA (chamadas reais, custo minimo)
 ```
 
 O conjunto rotulado (`app/classification/golden/contabilidade_v1.jsonl`, 60 mensagens sinteticas) foi escrito pela equipe e as regras foram ajustadas olhando para ele: os numeros dele sao otimistas. **A medida que vale e a das mensagens reais do piloto**: depois de rodar `classify-pending`, revise as linhas com `needs_review` e corrija os erros para virarem novos casos do conjunto.

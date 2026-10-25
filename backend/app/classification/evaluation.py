@@ -6,13 +6,15 @@ Sem --llm mede so as regras; com --llm exige ANTHROPIC_API_KEY e gasta chamadas 
 
 import argparse
 import json
+import os
 import sys
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
 from app.classification.domain import Context, Decision
-from app.classification.llm import AnthropicClassifier, LLMClassifier
+from app.classification.factory import build_classifier
+from app.classification.llm import LLMClassifier
 from app.classification.service import classify_message
 
 DEFAULT_GOLDEN = Path(__file__).parent / "golden" / "contabilidade_v1.jsonl"
@@ -135,7 +137,13 @@ def main(argv: list[str] | None = None) -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
 
-    llm = AnthropicClassifier() if args.llm else None
+    llm = None
+    if args.llm:
+        llm, description = build_classifier(os.environ)
+        print(description)
+        if llm is None:
+            print("nenhuma IA configurada: nada a avaliar com --llm", file=sys.stderr)
+            return 2
     print(evaluate(load_golden(), llm=llm).render(show_errors=args.errors))
     return 0
 

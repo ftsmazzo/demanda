@@ -132,13 +132,22 @@ def test_llm_answer_is_stored_with_model_name(database, admin_conn, channel):
     assert hint == "Padaria"
 
 
-def test_llm_outage_still_stores_a_reviewable_classification(database, admin_conn, channel):
+def test_temporary_llm_outage_leaves_the_message_pending_for_the_next_run(
+    database, admin_conn, channel
+):
     message = add_message(admin_conn, channel, "S12", "Pode me ajudar com uma coisa aqui?")
 
-    classify_pending(database, channel.tenant_id, llm=FakeLLM(error=ClassifierUnavailable("x")))
+    first = classify_pending(
+        database, channel.tenant_id, llm=FakeLLM(error=ClassifierUnavailable("x"))
+    )
+    assert first["deferred"] == 1
+    assert stored(admin_conn, message) == []
 
-    row = stored(admin_conn, message)[0]
-    assert (row[1], row[4], row[5], row[6]) == ("triagem", "fallback", True, "llm_unavailable")
+    second = classify_pending(
+        database, channel.tenant_id, llm=FakeLLM(llm_output(sector="dp", kind="duvida"))
+    )
+    assert second["classified"] == 1
+    assert stored(admin_conn, message)[0][1] == "dp"
 
 
 def test_classifications_are_isolated_by_tenant(
@@ -208,9 +217,10 @@ def test_unexpected_error_in_one_message_does_not_block_the_batch(database, admi
     first = add_message(admin_conn, channel, "E1", "Pode me ajudar com uma coisa aqui?", minutes=0)
     second = add_message(admin_conn, channel, "E2", "Quando vence o DAS esse mes?", minutes=1)
 
-    classify_pending(database, channel.tenant_id, llm=FakeLLM(error=RuntimeError("boom")))
+    counts = classify_pending(database, channel.tenant_id, llm=FakeLLM(error=RuntimeError("boom")))
 
-    assert stored(admin_conn, first)[0][6] == "llm_error"
+    assert counts["deferred"] == 1
+    assert stored(admin_conn, first) == []
     assert stored(admin_conn, second)[0][1] == "fiscal"
 
 

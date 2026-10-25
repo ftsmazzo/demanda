@@ -20,6 +20,9 @@ from app.db import Database
 logger = logging.getLogger(__name__)
 
 RECENT_MESSAGES = 5
+# falhas temporarias da IA nao viram classificacao definitiva: a mensagem fica pendente
+# e a proxima execucao tenta de novo
+_TRANSIENT_REASONS = {"llm_unavailable", "llm_error"}
 
 _PENDING = """
     SELECT m.id, m.channel_id, m.contact_phone, m.text, (m.media IS NOT NULL), m.provider_timestamp
@@ -78,6 +81,9 @@ def classify_pending(
     counts: Counter[str] = Counter()
     for message_id, text, context in work:
         decision = classify_message(text, context, llm=llm)
+        if decision.classification.reason in _TRANSIENT_REASONS:
+            counts["deferred"] += 1
+            continue
         try:
             with db.tenant_transaction(tenant_id) as conn:
                 conn.execute(_INSERT, _row(tenant_id, message_id, decision, model))

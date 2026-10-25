@@ -6,7 +6,7 @@ import sys
 
 import psycopg
 
-from app.classification.llm import AnthropicClassifier
+from app.classification.factory import build_classifier
 from app.classification.store import classify_pending
 from app.db import Database
 from app.provisioning import create_channel, create_runtime_role, create_tenant
@@ -125,10 +125,8 @@ def _classify_pending(conn: psycopg.Connection, limit: int, *, use_llm: bool) ->
         return 2
     llm = None
     if use_llm:
-        if os.environ.get("ANTHROPIC_API_KEY"):
-            llm = AnthropicClassifier()
-        else:
-            print("ANTHROPIC_API_KEY ausente: classificando so com regras")
+        llm, description = build_classifier(os.environ)
+        print(description)
     tenants = conn.execute("SELECT id, slug FROM tenants ORDER BY slug").fetchall()
     db = Database(runtime_url)
     db.open()
@@ -143,7 +141,7 @@ def _classify_pending(conn: psycopg.Connection, limit: int, *, use_llm: bool) ->
                 continue
             summary = " ".join(
                 f"{name}={counts[name]}"
-                for name in ("classified", "noise", "attach_reply", "failed")
+                for name in ("classified", "noise", "attach_reply", "deferred", "failed")
             )
             print(f"{slug}: {summary}")
     finally:

@@ -48,3 +48,13 @@ def test_rules_alone_meet_the_quality_floor_on_the_golden_set():
 
     assert report.rule_precision >= MIN_RULE_PRECISION, report.render()
     assert report.rule_coverage >= MIN_RULE_COVERAGE, report.render()
+
+
+def test_evaluation_with_llm_and_no_key_explains_and_fails(monkeypatch, capsys):
+    from app.classification.evaluation import main
+
+    for name in ("OPENROUTER_API_KEY", "ANTHROPIC_API_KEY", "CLASSIFIER_PROVIDER"):
+        monkeypatch.delenv(name, raising=False)
+
+    assert main(["--llm"]) == 2
+    assert "OPENROUTER_API_KEY" in capsys.readouterr().out
