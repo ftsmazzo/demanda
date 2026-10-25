@@ -66,7 +66,7 @@ export function PanelPage() {
       </p>
     );
   }
-  if (board.isError || !board.data) {
+  if (!board.data) {
     return (
       <div role="alert" className="loading">
         <p>Não foi possível carregar o painel.</p>

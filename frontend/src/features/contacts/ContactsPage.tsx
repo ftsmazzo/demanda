@@ -94,7 +94,7 @@ function ContactRow({ contact, onError }: { contact: ContactRef; onError: (error
         onChange={(event) =>
           patch.mutate(
             { id: contact.id, patch: { kind: event.target.value as ContactKind } },
-            { onError },
+            { onSuccess: () => onError(null), onError },
           )
         }
       >
@@ -160,7 +160,7 @@ export function ContactsPage() {
         <p role="status" className="loading">
           Carregando os contatos…
         </p>
-      ) : contacts.isError ? (
+      ) : !contacts.data ? (
         <div role="alert" className="loading">
           <p>Não foi possível carregar os contatos.</p>
           <button className="btn" type="button" onClick={() => void contacts.refetch()}>

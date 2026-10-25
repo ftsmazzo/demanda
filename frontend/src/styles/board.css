@@ -134,7 +134,7 @@
   }
 }
 
-.card[aria-selected="true"] {
+.card[aria-current="true"] {
   border-color: var(--azinhavre);
   box-shadow: inset 0 0 0 1px var(--azinhavre);
 }

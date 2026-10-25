@@ -21,6 +21,7 @@ _CSP = "; ".join(
         "img-src 'self' data:",
         "font-src 'self'",
         "connect-src 'self'",
+        "object-src 'none'",
         "base-uri 'self'",
         "form-action 'self'",
         "frame-ancestors 'none'",
@@ -33,6 +34,27 @@ _HTML_HEADERS = {
     "Referrer-Policy": "same-origin",
     "Cache-Control": "no-cache",
 }
+
+
+_COMMON_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "same-origin",
+    "Strict-Transport-Security": "max-age=31536000",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
+}
+
+
+def add_security_headers(app: FastAPI) -> None:
+    """Cabecalhos de seguranca em todas as respostas; a API nunca e guardada em cache."""
+
+    @app.middleware("http")
+    async def security_headers(request, call_next):
+        response = await call_next(request)
+        for name, value in _COMMON_HEADERS.items():
+            response.headers.setdefault(name, value)
+        if request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-store"
+        return response
 
 
 class HashedAssets(StaticFiles):

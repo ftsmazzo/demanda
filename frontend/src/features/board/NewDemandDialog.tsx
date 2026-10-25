@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { Me, Sector, Urgency, UserOut } from "../../api/types";
 import { useCreateDemand } from "../../hooks/demand";
 import { saveErrorMessage } from "../../lib/errors";
@@ -37,19 +37,44 @@ export function NewDemandDialog({ me, users, onClose, onCreated }: Props) {
     };
   }, []);
 
+  const busy = create.isPending;
+  const close = () => {
+    if (!busy) onClose();
+  };
+
   useEffect(() => {
+    // na captura, para o Escape fechar so este dialogo e nao tambem a gaveta que esta atras
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      if (!busy) onClose();
     };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
+  }, [busy, onClose]);
+
+  function trapTab(event: ReactKeyboardEvent<HTMLFormElement>) {
+    if (event.key !== "Tab") return;
+    const items = Array.from(
+      event.currentTarget.querySelectorAll<HTMLElement>("input, select, button:not(:disabled)"),
+    );
+    const first = items[0];
+    const last = items[items.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
 
   function submit(event: FormEvent) {
     event.preventDefault();
     const trimmed = title.trim();
     if (!trimmed) {
       setMissingTitle(true);
+      titleField.current?.focus();
       return;
     }
     create.mutate(
@@ -59,8 +84,8 @@ export function NewDemandDialog({ me, users, onClose, onCreated }: Props) {
   }
 
   return (
-    <div className="modal-scrim" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <form className="modal" role="dialog" aria-modal="true" aria-labelledby="new-demand-title" onSubmit={submit} noValidate>
+    <div className="modal-scrim" onMouseDown={(event) => event.target === event.currentTarget && close()}>
+      <form className="modal" role="dialog" aria-modal="true" aria-labelledby="new-demand-title" onSubmit={submit} onKeyDown={trapTab} noValidate>
         <h2 className="modal-title" id="new-demand-title">
           Nova demanda
         </h2>
@@ -72,12 +97,13 @@ export function NewDemandDialog({ me, users, onClose, onCreated }: Props) {
             value={title}
             maxLength={200}
             aria-invalid={missingTitle}
+            aria-describedby={missingTitle ? "new-demand-title-error" : undefined}
             onChange={(event) => {
               setTitle(event.target.value);
               setMissingTitle(false);
             }}
           />
-          {missingTitle ? <span className="form-error">Escreva o que precisa ser feito.</span> : null}
+          {missingTitle ? <span className="form-error" id="new-demand-title-error">Escreva o que precisa ser feito.</span> : null}
         </label>
         <div className="modal-row">
           <label className="field">
@@ -124,7 +150,7 @@ export function NewDemandDialog({ me, users, onClose, onCreated }: Props) {
           </p>
         ) : null}
         <div className="modal-actions">
-          <button className="btn" type="button" onClick={onClose}>
+          <button className="btn" type="button" onClick={close} disabled={busy}>
             Cancelar
           </button>
           <button className="btn btn-primary" type="submit" disabled={create.isPending}>

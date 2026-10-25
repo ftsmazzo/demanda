@@ -18,9 +18,10 @@ import { useBoard, useUsers } from "../../hooks/queries";
 import { moveErrorMessage } from "../../lib/errors";
 import { voiceSentence } from "../../lib/format";
 import { SECTORS, SECTOR_LABEL, STATUSES } from "../../lib/sectors";
+import { laneKeyboardCoordinates } from "./keyboard";
 import { CardBody } from "./DemandCard";
 import { Lane } from "./Lane";
-import { NewDemandDialog } from "./NewDemandDialog";
+import { NewDemandDialog, sectorsFor } from "./NewDemandDialog";
 
 const canSeeHr = (me: Me) => me.role === "socio" || me.sectors.includes("rh-interno");
 
@@ -41,7 +42,11 @@ export function BoardPage() {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
-    useSensor(KeyboardSensor),
+    // Enter abre a demanda (clique do botao); Espaco pega e solta o card; setas trocam de coluna
+    useSensor(KeyboardSensor, {
+      keyboardCodes: { start: ["Space"], cancel: ["Escape"], end: ["Space"] },
+      coordinateGetter: laneKeyboardCoordinates,
+    }),
   );
 
   function update(key: string, value: string) {
@@ -52,6 +57,7 @@ export function BoardPage() {
   }
 
   function open(card: Card) {
+    move.reset();
     const next = new URLSearchParams(params);
     next.set("demanda", card.id);
     setParams(next);
@@ -65,6 +71,9 @@ export function BoardPage() {
 
   function onDragEnd(event: DragEndEvent) {
     setDragging(null);
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>(`[data-card-id="${event.active.id}"]`)?.focus({ preventScroll: true });
+    });
     const card = cards.find((item) => item.id === event.active.id);
     const target = event.over?.id as Status | undefined;
     if (!card || !target || !STATUSES.includes(target) || card.status === target) return;
@@ -78,7 +87,7 @@ export function BoardPage() {
       </p>
     );
   }
-  if (board.isError || !board.data) {
+  if (!board.data) {
     return (
       <div role="alert" className="loading">
         <p>Não foi possível carregar o quadro.</p>
@@ -125,7 +134,7 @@ export function BoardPage() {
               ))}
             </select>
           ) : null}
-          {manager ? (
+          {manager && sectorsFor(me).length > 0 ? (
             <button className="btn btn-primary" type="button" onClick={() => setCreating(true)}>
               Nova demanda
             </button>

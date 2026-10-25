@@ -45,8 +45,21 @@ describe("demand drawer: steps", () => {
 
   it("ticks a step and saves it", async () => {
     const user = userEvent.setup({ delay: null });
+    let saved = false;
+    const ticked = detail({
+      subtasks: [
+        { id: "s1", title: "Localizar o pedido anterior", done: true },
+        { id: "s2", title: "Emitir a certidão", done: true },
+      ],
+      progress: { done: 2, total: 2, percent: 100 },
+    });
     const { calls } = setup(SOCIO, detail(), {
-      "PATCH /api/v1/subtasks/s1": () => [200, { id: "s1", title: "Localizar o pedido anterior", done: true }],
+      "PATCH /api/v1/subtasks/s1": () => {
+        saved = true;
+        return [200, { id: "s1", title: "Localizar o pedido anterior", done: true }];
+      },
+      // o servidor de verdade devolve o estado salvo quando a tela recarrega
+      "GET /api/v1/demands/d1": () => [200, saved ? ticked : detail()],
     });
 
     const box = await drawer();

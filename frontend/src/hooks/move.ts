@@ -11,6 +11,7 @@ export function useMoveDemand() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    mutationKey: ["move"],
     mutationFn: ({ id, to }: { id: string; to: Status }) => api.patchDemand(id, { status: to }),
     onMutate: async ({ id, to }) => {
       await queryClient.cancelQueries({ queryKey: ["board"] });
@@ -22,11 +23,14 @@ export function useMoveDemand() {
       return { snapshot };
     },
     onError: (_error, _vars, context) => {
+      // com outro movimento em voo, restaurar o retrato antigo apagaria o dele: o recarregamento final corrige
+      if (queryClient.isMutating({ mutationKey: ["move"] }) > 1) return;
       for (const [key, board] of context?.snapshot ?? []) queryClient.setQueryData(key, board);
     },
     onSettled: (_data, _error, vars) => {
-      void queryClient.invalidateQueries({ queryKey: ["board"] });
       void queryClient.invalidateQueries({ queryKey: ["demand", vars.id] });
+      if (queryClient.isMutating({ mutationKey: ["move"] }) > 1) return;
+      void queryClient.invalidateQueries({ queryKey: ["board"] });
     },
   });
 }

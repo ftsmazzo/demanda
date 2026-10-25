@@ -19,7 +19,7 @@ from app.limits import BodyLimitMiddleware
 from app.migrate import apply_migrations
 from app.provisioning import create_runtime_role
 from app.security.throttle import LoginThrottle
-from app.spa import mount_spa
+from app.spa import add_security_headers, mount_spa
 from app.webhooks import router as webhooks_router
 
 logger = logging.getLogger(__name__)
@@ -71,6 +71,7 @@ def create_app(
     app.state.db = db
     app.state.auth = AuthSettings(jwt_secret, token_ttl_seconds, LoginThrottle())
     app.add_middleware(BodyLimitMiddleware, max_bytes=max_body_bytes)
+    add_security_headers(app)
     app.include_router(webhooks_router)
     app.include_router(auth_router)
     app.include_router(demands_router)

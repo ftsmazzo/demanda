@@ -86,7 +86,7 @@ export function AppShell() {
       </p>
     );
   }
-  if (me.isError || !me.data) {
+  if (!me.data) {
     return (
       <div className="loading" role="alert">
         <p>Não foi possível carregar seus dados.</p>

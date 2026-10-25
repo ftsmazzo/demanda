@@ -133,7 +133,7 @@ describe("board", () => {
     const card = screen.getByRole("button", { name: /Quando vence o DAS/ });
     await user.click(card);
 
-    expect(card).toHaveAttribute("aria-selected", "true");
+    expect(card).toHaveAttribute("aria-current", "true");
   });
 
   it("says it is loading and can recover from a failure", async () => {
@@ -150,5 +150,14 @@ describe("board", () => {
     await user.click(screen.getByRole("button", { name: "Tentar de novo" }));
 
     expect(await screen.findByRole("heading", { name: "Novas" })).toBeInTheDocument();
+  });
+
+  it("opens a demand with Enter from the keyboard", async () => {
+    await openBoard();
+
+    screen.getByRole("button", { name: /Quando vence o DAS/ }).focus();
+    await userEvent.keyboard("{Enter}");
+
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 });

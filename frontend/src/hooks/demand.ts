@@ -33,6 +33,7 @@ export function useToggleSubtask(demandId: string) {
   const key = demandKey(demandId);
 
   return useMutation({
+    mutationKey: ["toggle", demandId],
     mutationFn: ({ id, done }: { id: string; done: boolean }) => api.patchSubtask(id, { done }),
     onMutate: async ({ id, done }) => {
       await queryClient.cancelQueries({ queryKey: key });
@@ -44,9 +45,12 @@ export function useToggleSubtask(demandId: string) {
       return { previous };
     },
     onError: (_error, _vars, context) => {
+      if (queryClient.isMutating({ mutationKey: ["toggle", demandId] }) > 1) return;
       if (context?.previous) queryClient.setQueryData(key, context.previous);
     },
-    onSuccess: () => {
+    onSettled: () => {
+      if (queryClient.isMutating({ mutationKey: ["toggle", demandId] }) > 1) return;
+      void queryClient.invalidateQueries({ queryKey: key });
       void queryClient.invalidateQueries({ queryKey: ["board"] });
     },
   });

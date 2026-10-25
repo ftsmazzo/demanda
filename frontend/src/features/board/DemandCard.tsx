@@ -103,7 +103,8 @@ export function DemandCard({ card, index, selected, onOpen }: Props) {
       ref={setNodeRef}
       className="card"
       data-dragging={isDragging}
-      aria-selected={selected}
+      aria-current={selected ? "true" : undefined}
+      data-card-id={card.id}
       aria-label={`${card.title}. ${who}. ${idleBadge(card)}.`}
       onClick={() => onOpen(card)}
       {...listeners}

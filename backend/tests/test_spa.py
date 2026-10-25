@@ -82,3 +82,24 @@ def test_without_a_static_dir_there_is_no_app(tmp_path):
         assert client.get("/").status_code == 404
     with TestClient(create_app(database_url=None, static_dir=tmp_path / "vazio")) as client:
         assert client.get("/").status_code == 404
+
+
+def test_api_responses_are_never_cached_and_carry_the_security_headers(web):
+    response = web.get("/health")
+
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["referrer-policy"] == "same-origin"
+    assert "max-age" in response.headers["strict-transport-security"]
+    assert "permissions-policy" in response.headers
+
+
+def test_api_paths_get_no_store(web):
+    response = web.get("/api/v1/me")
+
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_csp_blocks_plugins():
+    from app.spa import _CSP
+
+    assert "object-src 'none'" in _CSP
