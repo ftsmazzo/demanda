@@ -1,3 +1,4 @@
+import { useDroppable } from "@dnd-kit/core";
 import type { CSSProperties } from "react";
 import type { Card, Column } from "../../api/types";
 import { ageFill, idleLevel } from "../../lib/format";
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export function Lane({ column, selectedId, onOpen }: Props) {
+  const { setNodeRef, isOver } = useDroppable({ id: column.status });
   const open = column.status !== "concluido";
   const oldest = open && column.demands.length ? Math.max(...column.demands.map((card) => card.idle_hours)) : 0;
   const heat = {
@@ -22,7 +24,11 @@ export function Lane({ column, selectedId, onOpen }: Props) {
   const name = STATUS_LABEL[column.status];
 
   return (
-    <section className={`lane${open ? "" : " lane-done"}`} aria-label={name}>
+    <section
+      ref={setNodeRef}
+      className={`lane${open ? "" : " lane-done"}${isOver ? " lane-over" : ""}`}
+      aria-label={name}
+    >
       <div className="lane-head">
         <h2 className="lane-name">{name}</h2>
         <span className="lane-count num">{column.count}</span>

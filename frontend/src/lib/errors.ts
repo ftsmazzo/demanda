@@ -12,3 +12,11 @@ export function saveErrorMessage(error: unknown): string {
   }
   return SAVE_FAILED;
 }
+
+export function moveErrorMessage(error: unknown): string {
+  if (error instanceof ApiError && error.status === 403) {
+    return "Você não tem permissão para mover esta demanda. Ela voltou para onde estava.";
+  }
+  if (error instanceof ApiError && error.status === 0) return error.detail;
+  return "Não foi possível mover a demanda. Ela voltou para onde estava.";
+}

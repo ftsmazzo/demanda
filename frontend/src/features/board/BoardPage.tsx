@@ -1,10 +1,26 @@
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import type { Card, Me, Sector } from "../../api/types";
+import type { Card, Me, Sector, Status } from "../../api/types";
 import { useCurrentUser } from "../../components/AppShell";
+import { useMoveDemand } from "../../hooks/move";
 import { useBoard, useUsers } from "../../hooks/queries";
+import { moveErrorMessage } from "../../lib/errors";
 import { voiceSentence } from "../../lib/format";
-import { SECTORS, SECTOR_LABEL } from "../../lib/sectors";
+import { SECTORS, SECTOR_LABEL, STATUSES } from "../../lib/sectors";
+import { CardBody } from "./DemandCard";
 import { Lane } from "./Lane";
+import { NewDemandDialog } from "./NewDemandDialog";
 
 const canSeeHr = (me: Me) => me.role === "socio" || me.sectors.includes("rh-interno");
 
@@ -18,6 +34,15 @@ export function BoardPage() {
 
   const board = useBoard({ sector, assignee: person });
   const users = useUsers(manager);
+  const move = useMoveDemand();
+  const [dragging, setDragging] = useState<Card | null>(null);
+  const [creating, setCreating] = useState(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
+    useSensor(KeyboardSensor),
+  );
 
   function update(key: string, value: string) {
     const next = new URLSearchParams(params);
@@ -30,6 +55,20 @@ export function BoardPage() {
     const next = new URLSearchParams(params);
     next.set("demanda", card.id);
     setParams(next);
+  }
+
+  const cards = board.data?.columns.flatMap((column) => column.demands) ?? [];
+
+  function onDragStart(event: DragStartEvent) {
+    setDragging(cards.find((card) => card.id === event.active.id) ?? null);
+  }
+
+  function onDragEnd(event: DragEndEvent) {
+    setDragging(null);
+    const card = cards.find((item) => item.id === event.active.id);
+    const target = event.over?.id as Status | undefined;
+    if (!card || !target || !STATUSES.includes(target) || card.status === target) return;
+    move.mutate({ id: card.id, to: target });
   }
 
   if (board.isPending) {
@@ -50,7 +89,6 @@ export function BoardPage() {
     );
   }
 
-  const cards = board.data.columns.flatMap((column) => column.demands);
   return (
     <>
       <div className="view-head">
@@ -88,17 +126,44 @@ export function BoardPage() {
             </select>
           ) : null}
           {manager ? (
-            <button className="btn btn-primary" type="button">
+            <button className="btn btn-primary" type="button" onClick={() => setCreating(true)}>
               Nova demanda
             </button>
           ) : null}
         </div>
       </div>
-      <div className="board">
-        {board.data.columns.map((column) => (
-          <Lane key={column.status} column={column} selectedId={selectedId} onOpen={open} />
-        ))}
-      </div>
+      {move.isError ? (
+        <p role="alert" className="form-error board-alert">
+          {moveErrorMessage(move.error)}
+        </p>
+      ) : null}
+      <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setDragging(null)}>
+        <div className="board">
+          {board.data.columns.map((column) => (
+            <Lane key={column.status} column={column} selectedId={selectedId} onOpen={open} />
+          ))}
+        </div>
+        <DragOverlay>
+          {dragging ? (
+            <div className="card card-overlay">
+              <CardBody card={dragging} index={0} />
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
+      {creating ? (
+        <NewDemandDialog
+          me={me}
+          users={users.data ?? []}
+          onClose={() => setCreating(false)}
+          onCreated={(id) => {
+            setCreating(false);
+            const next = new URLSearchParams(params);
+            next.set("demanda", id);
+            setParams(next);
+          }}
+        />
+      ) : null}
     </>
   );
 }

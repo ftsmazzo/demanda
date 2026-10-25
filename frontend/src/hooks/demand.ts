@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { DemandPatch, Detail, Subtask } from "../api/types";
+import type { DemandCreate, DemandPatch, Detail, Subtask } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 
 const demandKey = (id: string) => ["demand", id];
@@ -61,6 +61,18 @@ export function useAddSubtask(demandId: string) {
       queryClient.setQueryData<Detail>(demandKey(demandId), (current) =>
         current ? withProgress({ ...current, subtasks: [...current.subtasks, created] }) : current,
       );
+      void queryClient.invalidateQueries({ queryKey: ["board"] });
+    },
+  });
+}
+
+export function useCreateDemand() {
+  const { api } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: DemandCreate) => api.createDemand(body),
+    onSuccess: (detail) => {
+      queryClient.setQueryData(demandKey(detail.id), detail);
       void queryClient.invalidateQueries({ queryKey: ["board"] });
     },
   });

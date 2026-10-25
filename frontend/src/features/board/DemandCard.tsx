@@ -1,3 +1,4 @@
+import { useDraggable } from "@dnd-kit/core";
 import type { CSSProperties } from "react";
 import type { Card } from "../../api/types";
 import { Icon } from "../../components/Icon";
@@ -39,19 +40,11 @@ export function Avatar({ name }: { name: string | null }) {
   );
 }
 
-interface Props {
-  card: Card;
-  index: number;
-  selected: boolean;
-  onOpen: (card: Card) => void;
-}
-
-export function DemandCard({ card, index, selected, onOpen }: Props) {
+/** O conteudo visual do card, sem comportamento: serve ao card e ao "fantasma" do arrastar. */
+export function CardBody({ card, index }: { card: Card; index: number }) {
   const closed = card.status === "concluido";
   const level = idleLevel(card.idle_hours);
   const flagged = !closed && card.urgency !== "normal";
-  const who = card.contact?.name ?? "Contato sem nome";
-  const badge = idleBadge(card);
   const gaugeStyle = {
     "--age": `${closed ? 100 : ageFill(card.idle_hours)}%`,
     "--age-color": closed ? "var(--age-0)" : AGE_COLOR[level],
@@ -59,18 +52,12 @@ export function DemandCard({ card, index, selected, onOpen }: Props) {
   } as CSSProperties;
 
   return (
-    <button
-      type="button"
-      className="card"
-      aria-selected={selected}
-      aria-label={`${card.title}. ${who}. ${badge}.`}
-      onClick={() => onOpen(card)}
-    >
+    <>
       <span className="gauge" aria-hidden="true">
         <span className="gauge-fill" style={gaugeStyle} />
       </span>
       <span className="card-title">{card.title}</span>
-      <span className="card-who">{who}</span>
+      <span className="card-who">{card.contact?.name ?? "Contato sem nome"}</span>
       <span className="card-meta">
         <span className="card-tags">
           <span className="sector" style={{ "--dot": SECTOR_COLOR[card.sector] } as CSSProperties}>
@@ -88,13 +75,42 @@ export function DemandCard({ card, index, selected, onOpen }: Props) {
           ) : null}
         </span>
         <span className="idle num" data-level={closed ? 0 : level}>
-          {badge}
+          {idleBadge(card)}
         </span>
       </span>
       <span className="card-foot">
         <Steps card={card} />
         <Avatar name={card.assignee?.name ?? null} />
       </span>
+    </>
+  );
+}
+
+interface Props {
+  card: Card;
+  index: number;
+  selected: boolean;
+  onOpen: (card: Card) => void;
+}
+
+export function DemandCard({ card, index, selected, onOpen }: Props) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: card.id });
+  const who = card.contact?.name ?? "Contato sem nome";
+
+  return (
+    <button
+      type="button"
+      ref={setNodeRef}
+      className="card"
+      data-dragging={isDragging}
+      aria-selected={selected}
+      aria-label={`${card.title}. ${who}. ${idleBadge(card)}.`}
+      onClick={() => onOpen(card)}
+      {...listeners}
+      {...attributes}
+      aria-roledescription="demanda arrastável"
+    >
+      <CardBody card={card} index={index} />
     </button>
   );
 }
