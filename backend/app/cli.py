@@ -51,6 +51,11 @@ def _build_parser() -> argparse.ArgumentParser:
     user.add_argument("--role", required=True, choices=ROLES)
     user.add_argument("--sector", action="append", default=[], help="repita para varios setores")
 
+    demands = sub.add_parser("demands", help="lista as demandas (quadro em texto)")
+    demands.add_argument("--limit", type=_review_limit, default=30, help="quantidade (1 a 200)")
+    demands.add_argument("--open", action="store_true", help="so as nao concluidas")
+    demands.add_argument("--tenant-slug", help="so as demandas deste tenant")
+
     sub.add_parser("stats", help="contagem de mensagens e latencia por canal (medicao do spike)")
 
     channel = sub.add_parser("create-channel", help="cria um canal e mostra o segredo uma vez")
@@ -101,6 +106,42 @@ _REVIEW_SQL = """
     LIMIT %s
 """
 _REVIEW_TEXT_CHARS = 90
+
+
+_DEMANDS_SQL = """
+    SELECT d.status, d.sector, d.urgency, d.kind, d.title, c.name, c.phone,
+           FLOOR(EXTRACT(EPOCH FROM (now() - d.last_activity_at)) / 3600)::int
+    FROM demands d LEFT JOIN contacts c ON c.id = d.contact_id
+    WHERE (NOT %s OR d.status <> 'concluido')
+      AND (%s::uuid IS NULL OR d.tenant_id = %s::uuid)
+    ORDER BY CASE d.status WHEN 'novo' THEN 1 WHEN 'em_andamento' THEN 2
+                           WHEN 'aguardando' THEN 3 ELSE 4 END,
+             CASE d.urgency WHEN 'critica' THEN 3 WHEN 'alta' THEN 2 ELSE 1 END DESC,
+             d.last_activity_at DESC
+    LIMIT %s
+"""
+
+
+def _print_demands(
+    conn: psycopg.Connection, limit: int, *, only_open: bool, tenant_slug: str | None
+) -> int:
+    tenant_id = None
+    if tenant_slug:
+        found = conn.execute("SELECT id FROM tenants WHERE slug = %s", (tenant_slug,)).fetchone()
+        if found is None:
+            print(f"tenant nao encontrado: {tenant_slug}", file=sys.stderr)
+            return 1
+        tenant_id = found[0]
+    rows = conn.execute(_DEMANDS_SQL, (only_open, tenant_id, tenant_id, limit)).fetchall()
+    for status, sector, urgency, kind, title, name, phone, idle in rows:
+        who = name or "sem nome"
+        waiting = f"parada {idle}h" if status != "concluido" else "concluida"
+        tail = phone[-4:] if phone else ""
+        head = f"[{status}] {sector}/{urgency} {kind}"
+        print(f"{head} | {who} ...{tail} | {waiting} | {title[:80]}")
+    if not rows:
+        print("nenhuma demanda")
+    return 0
 
 
 def _review_limit(value: str) -> int:
@@ -230,6 +271,11 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "create-user":
             return _create_user(conn, args)
+
+        if args.command == "demands":
+            return _print_demands(
+                conn, args.limit, only_open=args.open, tenant_slug=args.tenant_slug
+            )
 
         if args.command == "stats":
             return _print_stats(conn)

@@ -303,3 +303,31 @@ def test_create_user_refuses_weak_or_missing_passwords_and_bad_input(
     with pytest.raises(SystemExit):
         cli.main([*base[:-1], "superadmin"])
     assert cli.main([*base, "--sector", "marketing"]) == 2
+
+
+def test_demands_command_lists_the_board_in_text_and_filters_by_tenant(
+    admin_url, admin_conn, channel, other_channel, monkeypatch, capsys
+):
+    from tests.test_classification_store import add_message
+
+    monkeypatch.setenv("DATABASE_URL", admin_url)
+    monkeypatch.setenv("APP_DATABASE_URL", admin_url)
+    add_message(admin_conn, channel, "DL1", "Quando vence o DAS xyzquadro?", minutes=600000)
+    add_message(admin_conn, other_channel, "DL2", "Quando vence o DAS xyzoutro?", minutes=600000)
+    cli.main(["classify-pending", "--no-llm"])
+    capsys.readouterr()
+    slug = admin_conn.execute(
+        "SELECT slug FROM tenants WHERE id = %s", (channel.tenant_id,)
+    ).fetchone()[0]
+
+    assert cli.main(["demands", "--tenant-slug", slug]) == 0
+
+    out = capsys.readouterr().out
+    assert "xyzquadro" in out
+    assert "xyzoutro" not in out
+    line = next(row for row in out.splitlines() if "xyzquadro" in row)
+    assert "[novo]" in line
+    assert "fiscal" in line
+    with pytest.raises(SystemExit):
+        cli.main(["demands", "--limit", "0"])
+    assert cli.main(["demands", "--tenant-slug", "nao-existe"]) == 1

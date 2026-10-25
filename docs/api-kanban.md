@@ -12,6 +12,16 @@ Fluxo: mensagem do WhatsApp, depois contato, classificacao, demanda no quadro. T
 - ruido e mensagens enviadas pelo escritorio nao criam demanda;
 - mensagens que a IA nao resolve vao para o setor **triagem**, com revisao.
 
+## Ver o quadro sem a API
+
+```bash
+python -m app.cli classify-pending --no-llm        # classifica e cria as demandas
+python -m app.cli demands --tenant-slug SLUG       # quadro em texto
+python -m app.cli demands --tenant-slug SLUG --open --limit 100
+```
+
+Cada linha: `[status] setor/urgencia tipo | contato ...final do telefone | parada ha Nh | titulo`.
+
 ## Configuracao (EasyPanel, servico `api`)
 
 | Variavel | Para que serve |
