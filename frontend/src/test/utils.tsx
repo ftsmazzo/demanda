@@ -43,7 +43,7 @@ export function renderApp(ui: ReactElement, options: RenderOptions = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   const result = render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[route]}>
+      <MemoryRouter initialEntries={[route]} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <AuthProvider fetchImpl={mock.fetchImpl}>{ui}</AuthProvider>
       </MemoryRouter>
     </QueryClientProvider>,

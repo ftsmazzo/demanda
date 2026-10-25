@@ -215,3 +215,88 @@
   font-size: 13.5px;
   font-weight: 560;
 }
+
+/* estados e menus do app */
+.loading {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+  padding: 48px 8px;
+  color: var(--ink-2);
+  font-family: var(--font-voice);
+  font-size: 18px;
+}
+
+.loading .btn {
+  font-family: var(--font-ui);
+  font-size: 14px;
+}
+
+.card-tags {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.steps-wrap {
+  display: inline-flex;
+  align-items: center;
+  flex: 1;
+}
+
+.lock {
+  display: inline-flex;
+}
+
+button.me {
+  border: 0;
+  cursor: pointer;
+}
+
+.user-menu {
+  position: relative;
+}
+
+.menu {
+  position: absolute;
+  bottom: 0;
+  left: calc(100% + 10px);
+  z-index: 30;
+  min-width: 190px;
+  padding: 6px;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-m);
+  background: var(--surface);
+  box-shadow: 0 14px 30px -18px rgba(10, 25, 20, 0.45);
+}
+
+.menu-name {
+  padding: 8px 10px 6px;
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.menu-item {
+  display: block;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: transparent;
+  text-align: left;
+  font-weight: 560;
+}
+
+.menu-item:hover {
+  background: var(--lane);
+}
+
+@media (max-width: 900px) {
+  .menu {
+    bottom: calc(100% + 10px);
+    left: auto;
+    right: 0;
+  }
+}

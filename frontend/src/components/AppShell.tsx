@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { NavLink, Navigate, Outlet, useOutletContext } from "react-router-dom";
 import { useAuth, useMe } from "../auth/AuthContext";
 import type { Me, Role } from "../api/types";
+import { initials } from "../lib/format";
 import { Icon, type IconName } from "./Icon";
 import { Mark } from "./Mark";
 
@@ -17,14 +18,6 @@ const NAV: NavItem[] = [
   { to: "/painel", label: "Painel do sócio", icon: "chart", roles: ["socio"] },
   { to: "/contatos", label: "Contatos", icon: "people", roles: ["socio", "gestor"] },
 ];
-
-export function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  const first = parts[0][0];
-  const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
-  return (first + last).toUpperCase();
-}
 
 function UserMenu({ me }: { me: Me }) {
   const { logout } = useAuth();
