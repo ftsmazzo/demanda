@@ -383,3 +383,19 @@
   border-color: var(--rule-strong);
   background: var(--paper);
 }
+
+.panel-first {
+  margin-top: 0;
+}
+
+.load-total {
+  color: var(--ink-2);
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .panel-grid {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+}

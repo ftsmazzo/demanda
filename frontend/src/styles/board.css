@@ -385,13 +385,13 @@
   overflow-y: auto;
   padding: 24px 26px;
   border: 1px solid var(--rule-strong);
-  border-radius: var(--radius-l, 12px);
+  border-radius: var(--radius-m);
   background: var(--surface);
 }
 
 .modal-title {
   margin: 0;
-  font-family: var(--serif);
+  font-family: var(--font-voice);
   font-size: 24px;
   font-weight: 600;
   letter-spacing: -0.01em;
