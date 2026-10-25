@@ -131,3 +131,16 @@ export interface ChannelHealth {
   changed_at: string | null;
   checked_at: string | null;
 }
+
+export type AppointmentStatus = "proposed" | "confirmed" | "cancelled";
+
+export interface Appointment {
+  id: string;
+  title: string;
+  starts_at: string;
+  all_day: boolean;
+  status: AppointmentStatus;
+  demand_id: string;
+  sector: Sector;
+  contact: ContactRef | null;
+}

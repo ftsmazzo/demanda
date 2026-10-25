@@ -9,6 +9,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from psycopg_pool import PoolTimeout
 
+from app.api.appointments import router as appointments_router
 from app.api.auth import router as auth_router
 from app.api.channels import router as channels_router
 from app.api.demand_writes import router as demand_writes_router
@@ -99,6 +100,7 @@ def create_app(
     app.include_router(demand_writes_router)
     app.include_router(people_router)
     app.include_router(channels_router)
+    app.include_router(appointments_router)
 
     @app.exception_handler(PoolTimeout)
     async def pool_timeout_handler(_: Request, __: PoolTimeout) -> JSONResponse:

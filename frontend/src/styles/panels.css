@@ -479,3 +479,94 @@
     width: 100%;
   }
 }
+
+/* agenda */
+.agenda-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--rule);
+}
+
+.agenda-row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.agenda-row[data-status="cancelled"] .agenda-title {
+  text-decoration: line-through;
+  color: var(--ink-3);
+}
+
+.agenda-time {
+  font-family: var(--font-voice);
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.agenda-main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.agenda-title {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14.5px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.agenda-title:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.agenda-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+.agenda-state {
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 560;
+}
+
+.agenda-row[data-status="proposed"] .agenda-state {
+  color: var(--palha);
+}
+
+.agenda-row[data-status="confirmed"] .agenda-state {
+  color: var(--azinhavre);
+}
+
+.agenda-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.agenda-day {
+  margin-bottom: 26px;
+}
+
+@media (max-width: 720px) {
+  .agenda-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .agenda-actions {
+    grid-column: 1 / -1;
+  }
+}

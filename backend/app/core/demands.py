@@ -8,6 +8,7 @@ from uuid import UUID
 import psycopg
 
 from app.classification.domain import max_urgency
+from app.core.appointments import propose_appointment
 from app.db import Database
 
 logger = logging.getLogger(__name__)
@@ -118,6 +119,9 @@ def _materialize_one(conn: psycopg.Connection, tenant_id: UUID, row: tuple[Any, 
         )
         conn.execute(_LINK, (tenant_id, demand_id, message_id))
         conn.execute(_TOUCH, (new_urgency, sent_at, demand_id))
+        _maybe_appointment(
+            conn, tenant_id, demand_id, contact_id, message_id, text, sent_at, kind, action
+        )
         return "attached"
 
     if action == "attach_reply":
@@ -132,4 +136,31 @@ def _materialize_one(conn: psycopg.Connection, tenant_id: UUID, row: tuple[Any, 
         _CREATE, (tenant_id, contact_id, sector, kind, urgency, make_title(text), sent_at)
     ).fetchone()[0]
     conn.execute(_LINK, (tenant_id, demand_id, message_id))
+    _maybe_appointment(
+        conn, tenant_id, demand_id, contact_id, message_id, text, sent_at, kind, action
+    )
     return "created"
+
+
+def _maybe_appointment(
+    conn: psycopg.Connection,
+    tenant_id: UUID,
+    demand_id: UUID,
+    contact_id: UUID,
+    message_id: UUID,
+    text: str | None,
+    sent_at: Any,
+    kind: str,
+    action: str,
+) -> None:
+    if action == "classified" and kind == "compromisso":
+        propose_appointment(
+            conn,
+            tenant_id=tenant_id,
+            demand_id=demand_id,
+            contact_id=contact_id,
+            message_id=message_id,
+            text=text,
+            title=make_title(text),
+            sent_at=sent_at,
+        )

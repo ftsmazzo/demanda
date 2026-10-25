@@ -17,6 +17,7 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { to: "/", label: "Quadro", icon: "board", roles: ["socio", "gestor", "colaborador"] },
+  { to: "/agenda", label: "Agenda", icon: "calendar", roles: ["socio", "gestor", "colaborador"] },
   { to: "/painel", label: "Painel do sócio", icon: "chart", roles: ["socio"] },
   { to: "/contatos", label: "Contatos", icon: "people", roles: ["socio", "gestor"] },
 ];

@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { BoardFilters, ContactKind } from "../api/types";
+import type { AppointmentStatus, BoardFilters, ContactKind } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 
 export const boardKey = (filters: BoardFilters) => ["board", filters.sector ?? "", filters.assignee ?? ""];
@@ -55,5 +55,23 @@ export function useChannelHealth(enabled: boolean) {
     enabled,
     refetchInterval: 60_000,
     retry: false,
+  });
+}
+
+export function useAppointments() {
+  const { api } = useAuth();
+  return useQuery({
+    queryKey: ["appointments"],
+    queryFn: () => api.appointments(),
+    refetchInterval: 60_000,
+  });
+}
+
+export function usePatchAppointment() {
+  const { api } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: AppointmentStatus }) => api.patchAppointment(id, { status }),
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: ["appointments"] }),
   });
 }

@@ -9,6 +9,7 @@ import psycopg
 
 from app.classification.factory import build_classifier
 from app.classification.store import classify_pending
+from app.core.appointments import backfill_appointments
 from app.core.demands import materialize_demands
 from app.db import Database
 from app.provisioning import create_channel, create_runtime_role, create_tenant, create_user
@@ -55,6 +56,11 @@ def _build_parser() -> argparse.ArgumentParser:
     demands.add_argument("--limit", type=_review_limit, default=30, help="quantidade (1 a 200)")
     demands.add_argument("--open", action="store_true", help="so as nao concluidas")
     demands.add_argument("--tenant-slug", help="so as demandas deste tenant")
+
+    sub.add_parser(
+        "backfill-appointments",
+        help="propoe compromissos para reunioes que ja viraram demanda",
+    )
 
     sub.add_parser("stats", help="contagem de mensagens e latencia por canal (medicao do spike)")
 
@@ -208,6 +214,21 @@ def _classify_pending(conn: psycopg.Connection, limit: int, *, use_llm: bool) ->
     return 1 if failed else 0
 
 
+def _backfill_appointments(conn: psycopg.Connection) -> int:
+    runtime_url = os.environ.get("APP_DATABASE_URL")
+    if not runtime_url:
+        print("APP_DATABASE_URL nao definida", file=sys.stderr)
+        return 2
+    db = Database(runtime_url)
+    db.open()
+    try:
+        for tenant_id, slug in conn.execute("SELECT id, slug FROM tenants ORDER BY slug"):
+            print(f"{slug}: compromissos criados={backfill_appointments(db, tenant_id)}")
+    finally:
+        db.close()
+    return 0
+
+
 def _read_password() -> str | None:
     password = os.environ.get("USER_PASSWORD")
     if password:
@@ -276,6 +297,9 @@ def main(argv: list[str] | None = None) -> int:
             return _print_demands(
                 conn, args.limit, only_open=args.open, tenant_slug=args.tenant_slug
             )
+
+        if args.command == "backfill-appointments":
+            return _backfill_appointments(conn)
 
         if args.command == "stats":
             return _print_stats(conn)

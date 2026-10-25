@@ -2,7 +2,7 @@ from datetime import date, datetime
 from typing import Annotated, ClassVar, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 Status = Literal["novo", "em_andamento", "aguardando", "concluido"]
 Sector = Literal["triagem", "fiscal", "contabil", "dp", "societario", "financeiro", "rh-interno"]
@@ -143,3 +143,26 @@ class UserOut(BaseModel):
     name: str
     role: str
     sectors: list[str] = Field(default_factory=list)
+
+
+AppointmentStatus = Literal["proposed", "confirmed", "cancelled"]
+
+
+class AppointmentOut(BaseModel):
+    id: UUID
+    title: str
+    starts_at: datetime
+    all_day: bool
+    status: str
+    demand_id: UUID
+    sector: str
+    contact: ContactRef | None
+
+
+class AppointmentPatch(_AtLeastOneField):
+    not_nullable: ClassVar[tuple[str, ...]] = ("status", "starts_at", "all_day", "title")
+
+    status: AppointmentStatus | None = None
+    starts_at: AwareDatetime | None = None
+    all_day: bool | None = None
+    title: Title | None = None
