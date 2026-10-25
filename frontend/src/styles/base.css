@@ -1,0 +1,239 @@
+/* Demanda - tokens e base. Direcao: tempo parado como linguagem visual. */
+
+:root {
+  --paper: #f4f6f5;
+  --lane: #e9edeb;
+  --surface: #fcfdfc;
+  --ink: #17241f;
+  --ink-2: #44554e;
+  --ink-3: #5f716a;
+  --rule: #d3dbd7;
+  --rule-strong: #b7c3bd;
+  --azinhavre: #1d7a69;
+  --azinhavre-deep: #0f4f43;
+  --azinhavre-wash: #dcebe7;
+  --carimbo: #be3e2b;
+  --carimbo-wash: #f6e0db;
+  --palha: #8a5f0b;
+  --palha-wash: #f2e7cf;
+
+  /* escala do medidor de envelhecimento: recente, atencao, parada */
+  --age-0: #8fb7ac;
+  --age-1: #d6b157;
+  --age-2: #be3e2b;
+
+  --sector-fiscal: #3a6ea5;
+  --sector-contabil: #7a8450;
+  --sector-dp: #a8573e;
+  --sector-societario: #6b4e7a;
+  --sector-financeiro: #c28f2c;
+  --sector-triagem: #7b8a84;
+  --sector-rh: #8e3b55;
+
+  --font-ui: "Schibsted Grotesk Variable", "Schibsted Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-voice: "Source Serif 4 Variable", "Source Serif 4", Georgia, "Times New Roman", serif;
+
+  --radius-s: 4px;
+  --radius-m: 7px;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --rail: 68px;
+  --drawer: 520px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0e1512;
+    --lane: #141d19;
+    --surface: #19231f;
+    --ink: #e7eeea;
+    --ink-2: #b4c3bc;
+    --ink-3: #90a39b;
+    --rule: #263530;
+    --rule-strong: #38494f;
+    --azinhavre: #4fc2aa;
+    --azinhavre-deep: #8fe0cd;
+    --azinhavre-wash: #16332d;
+    --carimbo: #ee7a67;
+    --carimbo-wash: #3a1f1a;
+    --palha: #e0b25a;
+    --palha-wash: #33290f;
+    --age-0: #4d7d71;
+    --age-1: #c7a24b;
+    --age-2: #ee7a67;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.45;
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--azinhavre);
+  outline-offset: 2px;
+  border-radius: var(--radius-s);
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* casca do app */
+.app {
+  display: grid;
+  grid-template-columns: var(--rail) minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.rail {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 18px 0;
+  border-right: 1px solid var(--rule);
+  background: var(--paper);
+}
+
+.mark {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 18px;
+}
+
+.rail-link {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: var(--radius-m);
+  background: transparent;
+  color: var(--ink-3);
+  text-decoration: none;
+  transition-property: background-color, color;
+  transition-duration: 140ms;
+}
+
+.rail-link:hover {
+  background: var(--lane);
+  color: var(--ink);
+}
+
+.rail-link[aria-current="page"] {
+  color: var(--azinhavre-deep);
+  background: var(--azinhavre-wash);
+}
+
+.rail-link svg {
+  width: 21px;
+  height: 21px;
+}
+
+.rail-spacer {
+  flex: 1;
+}
+
+.me {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 12.5px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.main {
+  min-width: 0;
+  padding: 26px 32px 40px;
+}
+
+.view-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 22px;
+}
+
+/* nome da tela so para leitores de tela: a regua ja mostra onde o usuario esta */
+.view-title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.voice {
+  font-family: var(--font-voice);
+  font-size: clamp(22px, 2.3vw, 29px);
+  line-height: 1.22;
+  font-weight: 450;
+  letter-spacing: -0.012em;
+  max-width: 34ch;
+  text-wrap: balance;
+  font-variation-settings: "opsz" 40;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
