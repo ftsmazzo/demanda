@@ -234,3 +234,51 @@ def test_other_tenants_rows_are_filtered_in_the_recent_history_query(
     classify_pending(database, channel.tenant_id, llm=llm)
 
     assert llm.calls[0][1].recent == ()
+
+
+def all_rows(admin_conn, message_id):
+    return admin_conn.execute(
+        "SELECT source, reason, sector FROM message_classifications "
+        "WHERE message_id = %s ORDER BY created_at, id",
+        (message_id,),
+    ).fetchall()
+
+
+def test_rules_only_fallback_is_reclassified_once_an_llm_is_available(
+    database, admin_conn, channel
+):
+    message = add_message(admin_conn, channel, "N1", "Pode me ajudar com uma coisa aqui?")
+
+    classify_pending(database, channel.tenant_id)
+    assert all_rows(admin_conn, message) == [("fallback", "no_llm", "triagem")]
+
+    counts = classify_pending(
+        database, channel.tenant_id, llm=FakeLLM(llm_output(sector="dp", kind="duvida"))
+    )
+
+    assert counts["classified"] == 1
+    assert all_rows(admin_conn, message) == [
+        ("fallback", "no_llm", "triagem"),
+        ("llm", None, "dp"),
+    ]
+
+
+def test_rules_only_runs_do_not_pile_up_no_llm_rows(database, admin_conn, channel):
+    message = add_message(admin_conn, channel, "N2", "Pode me ajudar com uma coisa aqui?")
+
+    classify_pending(database, channel.tenant_id)
+    second = classify_pending(database, channel.tenant_id)
+
+    assert sum(second.values()) == 0
+    assert len(all_rows(admin_conn, message)) == 1
+
+
+def test_definitive_llm_results_are_not_redone(database, admin_conn, channel):
+    message = add_message(admin_conn, channel, "N3", "Pode me ajudar com uma coisa aqui?")
+    llm = FakeLLM(llm_output(sector="dp", kind="duvida"))
+
+    classify_pending(database, channel.tenant_id, llm=llm)
+    second = classify_pending(database, channel.tenant_id, llm=llm)
+
+    assert sum(second.values()) == 0
+    assert len(all_rows(admin_conn, message)) == 1

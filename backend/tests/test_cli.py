@@ -181,3 +181,28 @@ def test_review_hides_most_of_the_phone_number(admin_url, admin_conn, channel, m
     out = capsys.readouterr().out
     assert "987654321" not in out
     assert "4321" in out
+
+
+def test_review_shows_only_the_latest_classification_of_each_message(
+    admin_url, admin_conn, channel, monkeypatch, capsys
+):
+    from app.classification.store import classify_pending
+    from app.db import Database
+    from tests.test_classification_service import FakeLLM, llm_output
+    from tests.test_classification_store import add_message
+
+    monkeypatch.setenv("DATABASE_URL", admin_url)
+    add_message(admin_conn, channel, "R9", "Pode me ajudar com o caso xyzunico?", minutes=400000)
+    db = Database(admin_url)
+    db.open()
+    try:
+        classify_pending(db, channel.tenant_id)
+        classify_pending(db, channel.tenant_id, llm=FakeLLM(llm_output(sector="dp", kind="duvida")))
+    finally:
+        db.close()
+
+    cli.main(["review", "--limit", "5"])
+
+    lines = [row for row in capsys.readouterr().out.splitlines() if "xyzunico" in row]
+    assert len(lines) == 1
+    assert "dp/duvida" in lines[0]

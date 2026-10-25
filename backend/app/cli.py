@@ -81,7 +81,11 @@ def _print_stats(conn: psycopg.Connection) -> int:
 _REVIEW_SQL = """
     SELECT m.provider_timestamp, m.contact_phone, m.text, c.sector, c.kind, c.urgency,
            c.source, c.needs_review, c.reason, c.action
-    FROM message_classifications c JOIN messages m ON m.id = c.message_id
+    FROM (
+        SELECT DISTINCT ON (message_id) *
+        FROM message_classifications
+        ORDER BY message_id, created_at DESC, id DESC
+    ) c JOIN messages m ON m.id = c.message_id
     WHERE (NOT %s OR c.needs_review)
     ORDER BY m.provider_timestamp DESC
     LIMIT %s

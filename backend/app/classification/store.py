@@ -31,6 +31,7 @@ _PENDING = """
       AND NOT EXISTS (
           SELECT 1 FROM message_classifications c
           WHERE c.message_id = m.id AND c.rules_version = %s
+            AND (NOT %s OR c.reason IS DISTINCT FROM 'no_llm')
       )
     ORDER BY m.provider_timestamp, m.id
     LIMIT %s
@@ -51,7 +52,7 @@ _INSERT = """
         source, needs_review, reason, model, rules_version
     )
     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-    ON CONFLICT (message_id, rules_version) DO NOTHING
+    ON CONFLICT (message_id, rules_version) WHERE reason IS DISTINCT FROM 'no_llm' DO NOTHING
 """
 
 
@@ -68,7 +69,7 @@ def classify_pending(
     Uma mensagem que falhe ao gravar fica pendente (conta em "failed") e nao trava as demais.
     """
     with db.tenant_transaction(tenant_id) as conn:
-        pending = conn.execute(_PENDING, (RULES_VERSION, limit)).fetchall()
+        pending = conn.execute(_PENDING, (RULES_VERSION, llm is not None, limit)).fetchall()
         work = []
         for message_id, channel_id, phone, text, has_media, sent_at in pending:
             recent = conn.execute(
