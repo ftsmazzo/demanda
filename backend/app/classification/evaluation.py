@@ -47,6 +47,7 @@ class EvalReport:
     review_rate: float
     accuracy: dict[str, float]
     errors: list[EvalError]
+    fallback_reasons: dict[str, int]
 
     def render(self, *, show_errors: bool = False) -> str:
         lines = [
@@ -59,6 +60,8 @@ class EvalReport:
             + ", ".join(f"{name}={value:.0%}" for name, value in self.accuracy.items()),
             f"erros: {len(self.errors)}",
         ]
+        if self.fallback_reasons:
+            lines.append(f"motivos do fallback: {dict(self.fallback_reasons)}")
         if show_errors:
             for error in self.errors:
                 lines.append(
@@ -106,6 +109,9 @@ def evaluate(cases: list[GoldenCase], llm: LLMClassifier | None = None) -> EvalR
     by_rule = [(c, d) for c, d in outcomes if d.classification.source == "rule"]
     rule_ok = sum(_is_exact(c.expected, _got(d)) for c, d in by_rule)
     reviews = sum(d.classification.needs_review for _, d in outcomes)
+    fallback_reasons = Counter(
+        d.classification.reason for _, d in outcomes if d.classification.source == "fallback"
+    )
 
     classified_cases = [(c, d) for c, d in outcomes if c.expected["action"] == "classified"]
     accuracy = {"action": sum(c.expected["action"] == d.action for c, d in outcomes) / total}
@@ -126,6 +132,7 @@ def evaluate(cases: list[GoldenCase], llm: LLMClassifier | None = None) -> EvalR
         review_rate=reviews / total,
         accuracy=accuracy,
         errors=errors,
+        fallback_reasons=dict(fallback_reasons),
     )
 
 

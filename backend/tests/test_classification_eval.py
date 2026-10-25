@@ -58,3 +58,16 @@ def test_evaluation_with_llm_and_no_key_explains_and_fails(monkeypatch, capsys):
 
     assert main(["--llm"]) == 2
     assert "OPENROUTER_API_KEY" in capsys.readouterr().out
+
+
+def test_report_breaks_down_why_messages_fell_back():
+    from tests.test_classification_service import FakeLLM, llm_output
+
+    cases = [case("a", "Pode me ajudar com uma coisa aqui?", "triagem", "duvida")]
+
+    without_llm = evaluate(cases, llm=None)
+    unsure = evaluate(cases, llm=FakeLLM(llm_output(confidence=0.2)))
+
+    assert without_llm.fallback_reasons == {"no_llm": 1}
+    assert unsure.fallback_reasons == {"low_confidence": 1}
+    assert "low_confidence" in unsure.render()
