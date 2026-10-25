@@ -10,20 +10,23 @@ from fastapi.responses import JSONResponse
 from psycopg_pool import PoolTimeout
 
 from app.api.auth import router as auth_router
+from app.api.channels import router as channels_router
 from app.api.demand_writes import router as demand_writes_router
 from app.api.demands import router as demands_router
 from app.api.deps import AuthSettings
 from app.api.people import router as people_router
+from app.channel_health import EvolutionLike
 from app.classification.factory import build_classifier
 from app.classification.llm import LLMClassifier
 from app.db import DEFAULT_APP_ROLE, Database
+from app.evolution_client import EvolutionClient
 from app.limits import BodyLimitMiddleware
 from app.migrate import apply_migrations
 from app.provisioning import create_runtime_role
 from app.security.throttle import LoginThrottle
 from app.spa import add_security_headers, mount_spa
 from app.webhooks import router as webhooks_router
-from app.worker import BackgroundWorker
+from app.worker import BackgroundWorker, HealthMonitor
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +48,8 @@ def create_app(
     static_dir: str | Path | None = None,
     worker_interval_seconds: float | None = None,
     classifier: LLMClassifier | None = None,
+    evolution: EvolutionLike | None = None,
+    health_interval_seconds: float = 60,
 ) -> FastAPI:
     """database_url: conexao de runtime. admin_url: dono do schema, so para migrations."""
     db = Database(database_url, app_role=app_role, max_size=pool_max) if database_url else None
@@ -59,14 +64,19 @@ def create_app(
                     with psycopg.connect(owner_url, autocommit=True) as conn:
                         create_runtime_role(conn, password=runtime_password)
             db.open()
-        worker = None
+        workers: list[BackgroundWorker] = []
         if db is not None and worker_interval_seconds:
-            worker = BackgroundWorker(db, classifier, interval_seconds=worker_interval_seconds)
+            workers.append(
+                BackgroundWorker(db, classifier, interval_seconds=worker_interval_seconds)
+            )
+        if db is not None and evolution is not None:
+            workers.append(HealthMonitor(db, evolution, interval_seconds=health_interval_seconds))
+        for worker in workers:
             worker.start()
         try:
             yield
         finally:
-            if worker is not None:
+            for worker in workers:
                 worker.stop()
             if db is not None:
                 db.close()
@@ -88,6 +98,7 @@ def create_app(
     app.include_router(demands_router)
     app.include_router(demand_writes_router)
     app.include_router(people_router)
+    app.include_router(channels_router)
 
     @app.exception_handler(PoolTimeout)
     async def pool_timeout_handler(_: Request, __: PoolTimeout) -> JSONResponse:
@@ -109,6 +120,11 @@ def create_app(
 
 
 _admin_url = os.environ.get("DATABASE_URL")
+_evolution = (
+    EvolutionClient(os.environ["EVOLUTION_URL"], os.environ["EVOLUTION_API_KEY"])
+    if os.environ.get("EVOLUTION_URL") and os.environ.get("EVOLUTION_API_KEY")
+    else None
+)
 _worker_interval = float(os.environ.get("WORKER_INTERVAL_SECONDS", "0"))
 _classifier, _classifier_note = build_classifier(os.environ) if _worker_interval else (None, "")
 if _worker_interval:
@@ -126,4 +142,6 @@ app = create_app(
     token_ttl_seconds=int(os.environ.get("TOKEN_TTL_MINUTES", "480")) * 60,
     worker_interval_seconds=_worker_interval or None,
     classifier=_classifier,
+    evolution=_evolution,
+    health_interval_seconds=float(os.environ.get("HEALTH_INTERVAL_SECONDS", "60")),
 )

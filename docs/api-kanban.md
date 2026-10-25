@@ -78,6 +78,10 @@ curl -s https://demanda-api.kxryyk.easypanel.host/api/v1/board -H 'Authorization
 
 Com `WORKER_INTERVAL_SECONDS` (por exemplo `30`) a propria API roda um ciclo em segundo plano: classifica as mensagens novas (regras e, se houver chave, IA) e abre ou atualiza as demandas de cada tenant. Sem a variavel, so o `classify-pending` manual faz isso. Use uma unica replica da API.
 
+## Monitor da Evolution
+
+Com `EVOLUTION_URL` e `EVOLUTION_API_KEY` (e, opcionalmente, `HEALTH_INTERVAL_SECONDS`, padrao 60) a API consulta `GET /instance/connectionState/{instancia}` de cada canal e grava o estado em `channels.health_state`. Estando `open`, busca em `POST /chat/findMessages/{instancia}` as mensagens da janela desde a ultima reconciliacao (menos 10 min de folga; 24 h na primeira vez; no maximo 72 h) e grava as que o webhook nao entregou, sem duplicar. Quando o estado deixa de ser `open`, o log registra erro e a interface mostra um aviso aos socios e gestores (`GET /api/v1/channels/health`). A chave nunca vai ao navegador.
+
 ## Limitacoes conhecidas
 
 - A interface web (`frontend/`) e servida pela propria API a partir de `STATIC_DIR` (a imagem Docker ja a embute em `/app/static`). Mesma origem, sem CORS.

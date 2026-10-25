@@ -300,3 +300,21 @@ button.me {
     right: 0;
   }
 }
+
+.channel-alert {
+  margin: 0 0 18px;
+  padding: 12px 16px;
+  border: 1px solid var(--carimbo);
+  border-radius: var(--radius-m);
+  background: color-mix(in srgb, var(--carimbo) 8%, var(--surface));
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.channel-alert p {
+  margin: 0;
+}
+
+.channel-alert p + p {
+  margin-top: 6px;
+}

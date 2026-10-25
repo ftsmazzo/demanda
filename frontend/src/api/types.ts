@@ -122,3 +122,12 @@ export interface BoardFilters {
   sector?: Sector | "";
   assignee?: string;
 }
+
+export interface ChannelHealth {
+  id: string;
+  name: string;
+  state: string | null;
+  healthy: boolean;
+  changed_at: string | null;
+  checked_at: string | null;
+}

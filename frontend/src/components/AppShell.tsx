@@ -4,6 +4,7 @@ import { useAuth, useMe } from "../auth/AuthContext";
 import type { Me, Role } from "../api/types";
 import { DemandDrawer } from "../features/demand/DemandDrawer";
 import { initials } from "../lib/format";
+import { ChannelAlert } from "./ChannelAlert";
 import { Icon, type IconName } from "./Icon";
 import { Mark } from "./Mark";
 
@@ -120,6 +121,7 @@ export function AppShell() {
         <UserMenu me={user} />
       </nav>
       <main className="main">
+        <ChannelAlert me={user} />
         <Outlet context={user} />
       </main>
       <DemandDrawerHost me={user} />

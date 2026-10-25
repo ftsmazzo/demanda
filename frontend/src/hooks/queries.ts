@@ -46,3 +46,14 @@ export function usePatchContact() {
     },
   });
 }
+
+export function useChannelHealth(enabled: boolean) {
+  const { api } = useAuth();
+  return useQuery({
+    queryKey: ["channels-health"],
+    queryFn: () => api.channelsHealth(),
+    enabled,
+    refetchInterval: 60_000,
+    retry: false,
+  });
+}

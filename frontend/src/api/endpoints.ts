@@ -2,6 +2,7 @@ import type { Client } from "./client";
 import type {
   Board,
   BoardFilters,
+  ChannelHealth,
   ContactKind,
   ContactRef,
   DemandCreate,
@@ -39,6 +40,7 @@ export function createApi(client: Client) {
       request<Subtask>("POST", `/api/v1/demands/${safeId(demandId)}/subtasks`, { title }),
     patchSubtask: (id: string, patch: { title?: string; done?: boolean }) =>
       request<Subtask>("PATCH", `/api/v1/subtasks/${safeId(id)}`, patch),
+    channelsHealth: () => request<ChannelHealth[]>("GET", "/api/v1/channels/health"),
     users: () => request<UserOut[]>("GET", "/api/v1/users"),
     contacts: (query: { q?: string; kind?: ContactKind | "" } = {}) =>
       request<ContactRef[]>("GET", "/api/v1/contacts", undefined, { query: { ...query, limit: 100 } }),

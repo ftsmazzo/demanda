@@ -5,6 +5,7 @@ import threading
 from collections import Counter
 from collections.abc import Callable
 
+from app.channel_health import EvolutionLike, check_channels
 from app.classification.llm import LLMClassifier
 from app.classification.store import classify_pending
 from app.core.demands import materialize_demands
@@ -62,3 +63,22 @@ class BackgroundWorker(threading.Thread):
     def stop(self) -> None:
         self._stop_event.set()
         self.join(timeout=30)
+
+
+class HealthMonitor(BackgroundWorker):
+    """Confere a Evolution a cada ciclo e busca as mensagens que o webhook nao entregou."""
+
+    def __init__(
+        self,
+        db: Database,
+        evolution: EvolutionLike,
+        *,
+        interval_seconds: float,
+        on_cycle: Callable[[Counter[str]], None] | None = None,
+    ) -> None:
+        super().__init__(db, None, interval_seconds=interval_seconds, on_cycle=on_cycle)
+        self.name = "demanda-health"
+        self._evolution = evolution
+
+    def cycle(self) -> Counter[str]:
+        return check_channels(self._db, self._evolution)

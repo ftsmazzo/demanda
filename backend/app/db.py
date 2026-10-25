@@ -2,6 +2,7 @@ import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
+from typing import Any
 from uuid import UUID
 
 import psycopg
@@ -63,6 +64,11 @@ class Database:
         """Ids de todos os tenants, pela funcao SECURITY DEFINER (o runtime nao le a tabela)."""
         with self._pool.connection() as conn:
             return [row[0] for row in conn.execute("SELECT list_tenant_ids()").fetchall()]
+
+    def list_channels(self) -> list[tuple[Any, ...]]:
+        """(id, tenant_id, instance_name, listen_groups, health_state, last_reconciled_at)."""
+        with self._pool.connection() as conn:
+            return conn.execute("SELECT * FROM list_channels()").fetchall()
 
     def ping(self) -> bool:
         try:
