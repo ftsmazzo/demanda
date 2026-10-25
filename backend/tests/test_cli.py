@@ -228,3 +228,78 @@ def test_classify_pending_also_turns_messages_into_demands(
         "SELECT title FROM demands WHERE tenant_id = %s", (channel.tenant_id,)
     ).fetchone()[0]
     assert "xyzdemanda" in title
+
+
+def test_create_user_reads_the_password_from_the_environment_and_can_log_in(
+    admin_url, admin_conn, tenant_id, monkeypatch, capsys, api_client
+):
+    slug = admin_conn.execute("SELECT slug FROM tenants WHERE id = %s", (tenant_id,)).fetchone()[0]
+    monkeypatch.setenv("DATABASE_URL", admin_url)
+    monkeypatch.setenv("USER_PASSWORD", "uma-senha-bem-longa-123")
+
+    code = cli.main(
+        [
+            "create-user",
+            "--tenant-slug",
+            slug,
+            "--email",
+            "Gestora@Exemplo.com",
+            "--name",
+            "Gestora Fiscal",
+            "--role",
+            "gestor",
+            "--sector",
+            "fiscal",
+            "--sector",
+            "dp",
+        ]
+    )
+
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "uma-senha-bem-longa-123" not in out
+    login = api_client.post(
+        "/api/v1/auth/login",
+        json={
+            "tenant": slug,
+            "email": "gestora@exemplo.com",
+            "password": "uma-senha-bem-longa-123",
+        },
+    )
+    assert login.status_code == 200
+    me = api_client.get(
+        "/api/v1/me", headers={"Authorization": f"Bearer {login.json()['access_token']}"}
+    ).json()
+    assert (me["role"], me["sectors"]) == ("gestor", ["dp", "fiscal"])
+
+
+def test_create_user_refuses_weak_or_missing_passwords_and_bad_input(
+    admin_url, admin_conn, tenant_id, monkeypatch, capsys
+):
+    slug = admin_conn.execute("SELECT slug FROM tenants WHERE id = %s", (tenant_id,)).fetchone()[0]
+    monkeypatch.setenv("DATABASE_URL", admin_url)
+    base = [
+        "create-user",
+        "--tenant-slug",
+        slug,
+        "--email",
+        "a@exemplo.com",
+        "--name",
+        "A",
+        "--role",
+        "socio",
+    ]
+
+    monkeypatch.delenv("USER_PASSWORD", raising=False)
+    assert cli.main(base) == 2
+    assert "USER_PASSWORD" in capsys.readouterr().err
+
+    monkeypatch.setenv("USER_PASSWORD", "curta")
+    assert cli.main(base) == 2
+    assert "pelo menos" in capsys.readouterr().err
+
+    monkeypatch.setenv("USER_PASSWORD", "uma-senha-bem-longa-123")
+    assert cli.main(["create-user", "--tenant-slug", "nao-existe", *base[3:]]) == 1
+    with pytest.raises(SystemExit):
+        cli.main([*base[:-1], "superadmin"])
+    assert cli.main([*base, "--sector", "marketing"]) == 2

@@ -106,3 +106,58 @@ def database(admin_url: str):
         yield db
     finally:
         db.close()
+
+
+JWT_SECRET = "segredo-de-teste-com-mais-de-32-bytes!!"
+USER_PASSWORD = "senha-de-teste-123"
+
+
+@dataclass(frozen=True)
+class UserFixture:
+    id: UUID
+    tenant_id: UUID
+    tenant_slug: str
+    email: str
+    password: str
+    role: str
+
+
+@pytest.fixture
+def api_client(admin_url: str) -> Iterator[TestClient]:
+    app = create_app(database_url=admin_url, jwt_secret=JWT_SECRET)
+    with TestClient(app) as test_client:
+        yield test_client
+
+
+@pytest.fixture
+def make_user(admin_conn: psycopg.Connection):
+    from app.provisioning import create_user
+
+    def _make(tenant_id: UUID, role: str = "socio", sectors=(), *, email=None, active=True):
+        address = email or f"u{uuid4().hex[:8]}@exemplo.com"
+        user_id = create_user(
+            admin_conn,
+            tenant_id=tenant_id,
+            email=address,
+            name=f"Usuario {role}",
+            role=role,
+            password=USER_PASSWORD,
+            sectors=tuple(sectors),
+        )
+        if not active:
+            admin_conn.execute("UPDATE users SET active = false WHERE id = %s", (user_id,))
+        slug = admin_conn.execute(
+            "SELECT slug FROM tenants WHERE id = %s", (tenant_id,)
+        ).fetchone()[0]
+        return UserFixture(user_id, tenant_id, slug, address, USER_PASSWORD, role)
+
+    return _make
+
+
+def login_headers(client: TestClient, user: UserFixture) -> dict[str, str]:
+    response = client.post(
+        "/api/v1/auth/login",
+        json={"tenant": user.tenant_slug, "email": user.email, "password": user.password},
+    )
+    assert response.status_code == 200, response.text
+    return {"Authorization": f"Bearer {response.json()['access_token']}"}

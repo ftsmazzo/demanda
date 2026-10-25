@@ -53,3 +53,37 @@ def create_runtime_role(
         )
     )
     conn.execute(sql.SQL("GRANT demanda_app TO {}").format(sql.Identifier(name)))
+
+
+def create_user(
+    conn: psycopg.Connection,
+    *,
+    tenant_id: UUID,
+    email: str,
+    name: str,
+    role: str,
+    password: str,
+    sectors: tuple[str, ...] = (),
+) -> UUID:
+    """Cria um usuario do tenant (uso administrativo); o banco guarda so o hash da senha."""
+    from app.classification.domain import SECTORS
+    from app.security.passwords import hash_password
+    from app.security.tokens import ROLES
+
+    if role not in ROLES:
+        raise ValueError(f"papel invalido: {role}")
+    unknown = [sector for sector in sectors if sector not in SECTORS]
+    if unknown:
+        raise ValueError(f"setor invalido: {', '.join(unknown)}")
+
+    user_id = conn.execute(
+        "INSERT INTO users (tenant_id, email, name, role, password_hash) "
+        "VALUES (%s, %s, %s, %s, %s) RETURNING id",
+        (tenant_id, email.strip(), name.strip(), role, hash_password(password)),
+    ).fetchone()[0]
+    for sector in dict.fromkeys(sectors):
+        conn.execute(
+            "INSERT INTO user_sectors (user_id, tenant_id, sector) VALUES (%s, %s, %s)",
+            (user_id, tenant_id, sector),
+        )
+    return user_id

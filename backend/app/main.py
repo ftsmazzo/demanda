@@ -8,15 +8,22 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from psycopg_pool import PoolTimeout
 
+from app.api.auth import router as auth_router
+from app.api.demand_writes import router as demand_writes_router
+from app.api.demands import router as demands_router
+from app.api.deps import AuthSettings
+from app.api.people import router as people_router
 from app.db import DEFAULT_APP_ROLE, Database
 from app.limits import BodyLimitMiddleware
 from app.migrate import apply_migrations
 from app.provisioning import create_runtime_role
+from app.security.throttle import LoginThrottle
 from app.webhooks import router as webhooks_router
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_MAX_BODY_BYTES = 2_000_000
+DEFAULT_TOKEN_TTL_SECONDS = 8 * 3600
 
 
 def create_app(
@@ -28,6 +35,8 @@ def create_app(
     pool_max: int = 5,
     max_body_bytes: int = DEFAULT_MAX_BODY_BYTES,
     runtime_password: str | None = None,
+    jwt_secret: str | None = None,
+    token_ttl_seconds: int = DEFAULT_TOKEN_TTL_SECONDS,
 ) -> FastAPI:
     """database_url: conexao de runtime. admin_url: dono do schema, so para migrations."""
     db = Database(database_url, app_role=app_role, max_size=pool_max) if database_url else None
@@ -57,8 +66,13 @@ def create_app(
         openapi_url=None,
     )
     app.state.db = db
+    app.state.auth = AuthSettings(jwt_secret, token_ttl_seconds, LoginThrottle())
     app.add_middleware(BodyLimitMiddleware, max_bytes=max_body_bytes)
     app.include_router(webhooks_router)
+    app.include_router(auth_router)
+    app.include_router(demands_router)
+    app.include_router(demand_writes_router)
+    app.include_router(people_router)
 
     @app.exception_handler(PoolTimeout)
     async def pool_timeout_handler(_: Request, __: PoolTimeout) -> JSONResponse:
@@ -87,4 +101,6 @@ app = create_app(
     pool_max=int(os.environ.get("DB_POOL_MAX", "5")),
     max_body_bytes=int(os.environ.get("MAX_BODY_BYTES", str(DEFAULT_MAX_BODY_BYTES))),
     runtime_password=os.environ.get("APP_DB_PASSWORD"),
+    jwt_secret=os.environ.get("JWT_SECRET") or None,
+    token_ttl_seconds=int(os.environ.get("TOKEN_TTL_MINUTES", "480")) * 60,
 )

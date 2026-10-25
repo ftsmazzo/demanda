@@ -1,6 +1,7 @@
 """CLI administrativa: python -m app.cli <comando>. Usa DATABASE_URL (papel dono do schema)."""
 
 import argparse
+import getpass
 import os
 import sys
 
@@ -10,7 +11,8 @@ from app.classification.factory import build_classifier
 from app.classification.store import classify_pending
 from app.core.demands import materialize_demands
 from app.db import Database
-from app.provisioning import create_channel, create_runtime_role, create_tenant
+from app.provisioning import create_channel, create_runtime_role, create_tenant, create_user
+from app.security.tokens import ROLES
 
 MAX_CLASSIFY_LIMIT = 1000
 
@@ -41,6 +43,13 @@ def _build_parser() -> argparse.ArgumentParser:
     review.add_argument(
         "--needs-review", action="store_true", help="so as que pedem revisao humana"
     )
+
+    user = sub.add_parser("create-user", help="cria um usuario; a senha vem de USER_PASSWORD")
+    user.add_argument("--tenant-slug", required=True)
+    user.add_argument("--email", required=True)
+    user.add_argument("--name", required=True)
+    user.add_argument("--role", required=True, choices=ROLES)
+    user.add_argument("--sector", action="append", default=[], help="repita para varios setores")
 
     sub.add_parser("stats", help="contagem de mensagens e latencia por canal (medicao do spike)")
 
@@ -158,6 +167,48 @@ def _classify_pending(conn: psycopg.Connection, limit: int, *, use_llm: bool) ->
     return 1 if failed else 0
 
 
+def _read_password() -> str | None:
+    password = os.environ.get("USER_PASSWORD")
+    if password:
+        return password
+    if sys.stdin.isatty():
+        first = getpass.getpass("Senha: ")
+        if first == getpass.getpass("Repita a senha: "):
+            return first
+        print("as senhas nao conferem", file=sys.stderr)
+        return None
+    print("USER_PASSWORD nao definida (ou rode num terminal interativo)", file=sys.stderr)
+    return None
+
+
+def _create_user(conn: psycopg.Connection, args: argparse.Namespace) -> int:
+    password = _read_password()
+    if password is None:
+        return 2
+    row = conn.execute("SELECT id FROM tenants WHERE slug = %s", (args.tenant_slug,)).fetchone()
+    if row is None:
+        print(f"tenant nao encontrado: {args.tenant_slug}", file=sys.stderr)
+        return 1
+    try:
+        user_id = create_user(
+            conn,
+            tenant_id=row[0],
+            email=args.email,
+            name=args.name,
+            role=args.role,
+            password=password,
+            sectors=tuple(args.sector),
+        )
+    except ValueError as exc:
+        print(f"erro: {exc}", file=sys.stderr)
+        return 2
+    except psycopg.errors.UniqueViolation:
+        print("ja existe um usuario com esse e-mail neste tenant", file=sys.stderr)
+        return 1
+    print(f"usuario criado: {user_id} ({args.role})")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     database_url = os.environ.get("DATABASE_URL")
@@ -176,6 +227,9 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "review":
             return _print_review(conn, args.limit, only_review=args.needs_review)
+
+        if args.command == "create-user":
+            return _create_user(conn, args)
 
         if args.command == "stats":
             return _print_stats(conn)

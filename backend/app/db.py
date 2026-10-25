@@ -21,6 +21,15 @@ class ChannelAuth:
     listen_groups: bool
 
 
+@dataclass(frozen=True, slots=True)
+class AuthUser:
+    user_id: UUID
+    tenant_id: UUID
+    password_hash: str
+    role: str
+    name: str
+
+
 class Database:
     """Pool de conexoes que sempre opera com o papel restrito (RLS vale para ele).
 
@@ -63,6 +72,11 @@ class Database:
         with self._pool.connection() as conn:
             row = conn.execute("SELECT * FROM auth_channel(%s)", (channel_id,)).fetchone()
         return ChannelAuth(*row) if row else None
+
+    def auth_user(self, tenant_slug: str, email: str) -> AuthUser | None:
+        with self._pool.connection() as conn:
+            row = conn.execute("SELECT * FROM auth_user(%s, %s)", (tenant_slug, email)).fetchone()
+        return AuthUser(*row) if row else None
 
     @contextmanager
     def tenant_transaction(self, tenant_id: UUID) -> Iterator[psycopg.Connection]:

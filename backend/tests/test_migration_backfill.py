@@ -56,7 +56,7 @@ def test_backfill_creates_one_contact_per_phone_and_links_every_message(legacy_d
             conn, tenant, channel, "L3", "out", "5522222222222", "Escritorio", "2026-10-02T11:00Z"
         )
 
-    assert apply_migrations(legacy_db_url) == ["0004_core"]
+    assert apply_migrations(legacy_db_url)[0] == "0004_core"
 
     with psycopg.connect(legacy_db_url, autocommit=True) as conn:
         contacts = conn.execute("SELECT phone, name FROM contacts ORDER BY phone").fetchall()
@@ -77,4 +77,5 @@ def test_migrations_apply_cleanly_on_an_empty_database(legacy_db_url):
     applied = apply_migrations(legacy_db_url)
 
     assert applied[0] == "0001_init"
-    assert applied[-1] == "0004_core"
+    assert "0004_core" in applied
+    assert applied == sorted(applied)

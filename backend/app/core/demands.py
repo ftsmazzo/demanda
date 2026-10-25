@@ -29,6 +29,7 @@ _PENDING = """
     WHERE c.action IN ('classified', 'attach_reply')
       AND m.contact_id IS NOT NULL
       AND NOT EXISTS (SELECT 1 FROM demand_messages dm WHERE dm.message_id = m.id)
+      AND NOT EXISTS (SELECT 1 FROM skipped_messages sk WHERE sk.message_id = m.id)
     ORDER BY m.provider_timestamp, m.id
     LIMIT %s
 """
@@ -98,6 +99,13 @@ def materialize_demands(db: Database, tenant_id: UUID, *, limit: int = 200) -> C
 def _materialize_one(conn: psycopg.Connection, tenant_id: UUID, row: tuple[Any, ...]) -> str:
     message_id, contact_id, text, sent_at, action, sector, kind, urgency = row
 
+    # uma execucao por contato de cada vez: evita demandas duplicadas quando ha concorrencia
+    conn.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (str(contact_id),))
+    if conn.execute(
+        "SELECT 1 FROM demand_messages WHERE message_id = %s", (message_id,)
+    ).fetchone():
+        return "already"
+
     if action == "attach_reply":
         found = conn.execute(_LATEST_OPEN, (contact_id,)).fetchone()
     else:
@@ -113,6 +121,11 @@ def _materialize_one(conn: psycopg.Connection, tenant_id: UUID, row: tuple[Any, 
         return "attached"
 
     if action == "attach_reply":
+        conn.execute(
+            "INSERT INTO skipped_messages (tenant_id, message_id, reason) "
+            "VALUES (%s, %s, 'attach_without_open_demand') ON CONFLICT DO NOTHING",
+            (tenant_id, message_id),
+        )
         return "skipped"
 
     demand_id = conn.execute(

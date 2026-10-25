@@ -154,3 +154,17 @@ def test_user_role_is_restricted(admin_conn, channel: ChannelFixture):
             "VALUES (%s, 'a@b.com', 'A', 'superadmin', 'x')",
             (channel.tenant_id,),
         )
+
+
+def test_app_role_cannot_read_password_hashes(admin_conn, app_conn, channel: ChannelFixture):
+    admin_conn.execute(
+        "INSERT INTO users (tenant_id, email, name, role, password_hash) "
+        "VALUES (%s, 'h@exemplo.com', 'H', 'socio', 'hash-secreto')",
+        (channel.tenant_id,),
+    )
+    set_tenant(app_conn, channel.tenant_id)
+
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        app_conn.execute("SELECT password_hash FROM users")
+    assert app_conn.execute("SELECT count(*) FROM users").fetchone()[0] == 1
+    assert app_conn.execute("SELECT email, name, role FROM users").fetchone()[0] == "h@exemplo.com"

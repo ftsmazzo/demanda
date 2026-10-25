@@ -162,3 +162,47 @@ def test_materializing_one_tenant_never_touches_another(
 
     assert len(demands_of(admin_conn, channel.tenant_id)) == 1
     assert demands_of(admin_conn, other_channel.tenant_id) == []
+
+
+def _force_classification(conn, tenant_id, message_id, action):
+    conn.execute(
+        "INSERT INTO message_classifications (tenant_id, message_id, action, sector, kind, "
+        "urgency, confidence, source, rules_version) "
+        "VALUES (%s, %s, %s, 'triagem', 'indefinido', 'normal', 0.9, 'rule', 'teste-skip')",
+        (tenant_id, message_id, action),
+    )
+
+
+def test_an_acknowledgement_without_an_open_demand_is_skipped_once_not_forever(
+    database, admin_conn, channel
+):
+    message = add_message(admin_conn, channel, "SK1", "ok")
+    _force_classification(admin_conn, channel.tenant_id, message, "attach_reply")
+
+    first = materialize_demands(database, channel.tenant_id)
+    second = materialize_demands(database, channel.tenant_id)
+
+    assert first["skipped"] == 1
+    assert sum(second.values()) == 0
+    assert demands_of(admin_conn, channel.tenant_id) == []
+
+
+def test_concurrent_runs_never_create_duplicate_demands_for_the_same_topic(
+    database, admin_conn, channel
+):
+    from concurrent.futures import ThreadPoolExecutor
+
+    for index in range(6):
+        add_message(
+            admin_conn, channel, f"CC{index}", "Quando vence o DAS esse mes?", minutes=index
+        )
+    classify_pending(database, channel.tenant_id)
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        futures = [pool.submit(materialize_demands, database, channel.tenant_id) for _ in range(4)]
+        results = [future.result() for future in futures]
+
+    assert len(demands_of(admin_conn, channel.tenant_id)) == 1
+    total = sum(r["created"] + r["attached"] for r in results)
+    assert total == 6
+    assert sum(r["failed"] for r in results) == 0
