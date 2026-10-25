@@ -1,0 +1,110 @@
+"""Le mensagens pendentes, classifica e grava o resultado (uma transacao curta por etapa).
+
+Limitacoes conhecidas (dependem de tabelas que ainda nao existem): o contexto nao traz o tipo do
+contato, se ha demanda aberta nem o setor padrao do canal. Por isso respostas curtas ("ok") viram
+ruido em vez de anexar a uma demanda, e a regra de RH interno ainda nao dispara em producao.
+Rode uma execucao por vez: duas execucoes simultaneas pagariam a IA duas vezes pela mesma mensagem.
+"""
+
+import logging
+from collections import Counter
+from typing import Any
+from uuid import UUID
+
+from app.classification.domain import Context, Decision
+from app.classification.llm import LLMClassifier
+from app.classification.rules import RULES_VERSION
+from app.classification.service import classify_message
+from app.db import Database
+
+logger = logging.getLogger(__name__)
+
+RECENT_MESSAGES = 5
+
+_PENDING = """
+    SELECT m.id, m.channel_id, m.contact_phone, m.text, (m.media IS NOT NULL), m.provider_timestamp
+    FROM messages m
+    WHERE m.direction = 'in'
+      AND NOT EXISTS (
+          SELECT 1 FROM message_classifications c
+          WHERE c.message_id = m.id AND c.rules_version = %s
+      )
+    ORDER BY m.provider_timestamp, m.id
+    LIMIT %s
+"""
+
+# Inclui as respostas enviadas pelo escritorio de proposito: dao contexto a conversa.
+_RECENT = """
+    SELECT text FROM messages
+    WHERE tenant_id = %s AND channel_id = %s AND contact_phone = %s
+      AND provider_timestamp < %s AND text IS NOT NULL
+    ORDER BY provider_timestamp DESC
+    LIMIT %s
+"""
+
+_INSERT = """
+    INSERT INTO message_classifications (
+        tenant_id, message_id, action, sector, kind, urgency, client_hint, confidence,
+        source, needs_review, reason, model, rules_version
+    )
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    ON CONFLICT (message_id, rules_version) DO NOTHING
+"""
+
+
+def classify_pending(
+    db: Database,
+    tenant_id: UUID,
+    *,
+    llm: LLMClassifier | None = None,
+    limit: int = 200,
+) -> Counter[str]:
+    """Classifica ate `limit` mensagens recebidas ainda sem classificacao (mais antigas primeiro).
+
+    A leitura e a escrita ficam em transacoes curtas; a chamada de IA acontece fora delas.
+    Uma mensagem que falhe ao gravar fica pendente (conta em "failed") e nao trava as demais.
+    """
+    with db.tenant_transaction(tenant_id) as conn:
+        pending = conn.execute(_PENDING, (RULES_VERSION, limit)).fetchall()
+        work = []
+        for message_id, channel_id, phone, text, has_media, sent_at in pending:
+            recent = conn.execute(
+                _RECENT, (tenant_id, channel_id, phone, sent_at, RECENT_MESSAGES)
+            ).fetchall()
+            context = Context(has_media=has_media, recent=tuple(row[0] for row in reversed(recent)))
+            work.append((message_id, text or "", context))
+
+    model = getattr(llm, "model", None)
+    counts: Counter[str] = Counter()
+    for message_id, text, context in work:
+        decision = classify_message(text, context, llm=llm)
+        try:
+            with db.tenant_transaction(tenant_id) as conn:
+                conn.execute(_INSERT, _row(tenant_id, message_id, decision, model))
+        except Exception:
+            logger.exception("falha ao gravar a classificacao da mensagem %s", message_id)
+            counts["failed"] += 1
+            continue
+        counts[decision.action] += 1
+    return counts
+
+
+def _row(
+    tenant_id: UUID, message_id: UUID, decision: Decision, model: str | None
+) -> tuple[Any, ...]:
+    c = decision.classification
+    return (
+        tenant_id,
+        message_id,
+        decision.action,
+        c.sector,
+        c.kind,
+        c.urgency,
+        c.client_hint,
+        c.confidence,
+        c.source,
+        c.needs_review,
+        c.reason,
+        model if c.source == "llm" else None,
+        RULES_VERSION,
+    )

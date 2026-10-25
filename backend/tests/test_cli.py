@@ -69,3 +69,57 @@ def test_stats_reports_counts_and_latency_per_channel(
     assert "in=1" in line
     assert "out=1" in line
     assert "latencia_media_s=" in line
+
+
+def test_classify_pending_command_classifies_without_llm(
+    admin_url, admin_conn, channel, monkeypatch, capsys
+):
+    from tests.test_classification_store import add_message
+
+    monkeypatch.setenv("DATABASE_URL", admin_url)
+    monkeypatch.setenv("APP_DATABASE_URL", admin_url)
+    message = add_message(admin_conn, channel, "C1", "Quando vence o DAS esse mes?")
+
+    code = cli.main(["classify-pending", "--no-llm"])
+
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "classified=1" in out
+    row = admin_conn.execute(
+        "SELECT sector FROM message_classifications WHERE message_id = %s", (message,)
+    ).fetchone()
+    assert row == ("fiscal",)
+
+
+def test_classify_pending_warns_when_the_api_key_is_missing(
+    admin_url, admin_conn, channel, monkeypatch, capsys
+):
+    from tests.test_classification_store import add_message
+
+    monkeypatch.setenv("DATABASE_URL", admin_url)
+    monkeypatch.setenv("APP_DATABASE_URL", admin_url)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    add_message(admin_conn, channel, "C2", "Pode me ajudar com uma coisa aqui?")
+
+    code = cli.main(["classify-pending"])
+
+    assert code == 0
+    assert "ANTHROPIC_API_KEY" in capsys.readouterr().out
+
+
+def test_classify_pending_refuses_to_run_without_the_restricted_runtime_url(
+    admin_url, monkeypatch, capsys
+):
+    monkeypatch.setenv("DATABASE_URL", admin_url)
+    monkeypatch.delenv("APP_DATABASE_URL", raising=False)
+
+    code = cli.main(["classify-pending", "--no-llm"])
+
+    assert code == 2
+    assert "APP_DATABASE_URL" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("limit", ["0", "-5", "100000"])
+def test_classify_pending_limit_must_be_between_1_and_1000(limit):
+    with pytest.raises(SystemExit):
+        cli.main(["classify-pending", "--limit", limit])

@@ -94,3 +94,15 @@ def other_channel(admin_conn: psycopg.Connection) -> ChannelFixture:
 def client(admin_url: str) -> Iterator[TestClient]:
     with TestClient(create_app(database_url=admin_url)) as test_client:
         yield test_client
+
+
+@pytest.fixture
+def database(admin_url: str):
+    from app.db import Database
+
+    db = Database(admin_url)
+    db.open()
+    try:
+        yield db
+    finally:
+        db.close()

@@ -6,7 +6,12 @@ import sys
 
 import psycopg
 
+from app.classification.llm import AnthropicClassifier
+from app.classification.store import classify_pending
+from app.db import Database
 from app.provisioning import create_channel, create_runtime_role, create_tenant
+
+MAX_CLASSIFY_LIMIT = 1000
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -21,6 +26,14 @@ def _build_parser() -> argparse.ArgumentParser:
         "create-runtime-role",
         help="cria o login de runtime; a senha vem da variavel APP_DB_PASSWORD",
     )
+
+    classify = sub.add_parser(
+        "classify-pending", help="classifica mensagens ainda sem classificacao"
+    )
+    classify.add_argument(
+        "--limit", type=_bounded_limit, default=200, help="maximo por tenant (1 a 1000)"
+    )
+    classify.add_argument("--no-llm", action="store_true", help="so regras, sem chamar a IA")
 
     sub.add_parser("stats", help="contagem de mensagens e latencia por canal (medicao do spike)")
 
@@ -59,6 +72,49 @@ def _print_stats(conn: psycopg.Connection) -> int:
     return 0
 
 
+def _bounded_limit(value: str) -> int:
+    number = int(value)
+    if not 1 <= number <= MAX_CLASSIFY_LIMIT:
+        raise argparse.ArgumentTypeError(f"deve estar entre 1 e {MAX_CLASSIFY_LIMIT}")
+    return number
+
+
+def _classify_pending(conn: psycopg.Connection, limit: int, *, use_llm: bool) -> int:
+    runtime_url = os.environ.get("APP_DATABASE_URL")
+    if not runtime_url:
+        print(
+            "APP_DATABASE_URL nao definida: o classify-pending nao roda com a conexao do dono",
+            file=sys.stderr,
+        )
+        return 2
+    llm = None
+    if use_llm:
+        if os.environ.get("ANTHROPIC_API_KEY"):
+            llm = AnthropicClassifier()
+        else:
+            print("ANTHROPIC_API_KEY ausente: classificando so com regras")
+    tenants = conn.execute("SELECT id, slug FROM tenants ORDER BY slug").fetchall()
+    db = Database(runtime_url)
+    db.open()
+    failed = 0
+    try:
+        for tenant_id, slug in tenants:
+            try:
+                counts = classify_pending(db, tenant_id, llm=llm, limit=limit)
+            except Exception as exc:
+                failed += 1
+                print(f"{slug}: erro ({type(exc).__name__})", file=sys.stderr)
+                continue
+            summary = " ".join(
+                f"{name}={counts[name]}"
+                for name in ("classified", "noise", "attach_reply", "failed")
+            )
+            print(f"{slug}: {summary}")
+    finally:
+        db.close()
+    return 1 if failed else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     database_url = os.environ.get("DATABASE_URL")
@@ -71,6 +127,9 @@ def main(argv: list[str] | None = None) -> int:
             tenant_id = create_tenant(conn, slug=args.slug, name=args.name)
             print(f"tenant criado: {tenant_id}")
             return 0
+
+        if args.command == "classify-pending":
+            return _classify_pending(conn, args.limit, use_llm=not args.no_llm)
 
         if args.command == "stats":
             return _print_stats(conn)
