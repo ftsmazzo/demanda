@@ -8,6 +8,7 @@ import psycopg
 
 from app.classification.factory import build_classifier
 from app.classification.store import classify_pending
+from app.core.demands import materialize_demands
 from app.db import Database
 from app.provisioning import create_channel, create_runtime_role, create_tenant
 
@@ -139,6 +140,7 @@ def _classify_pending(conn: psycopg.Connection, limit: int, *, use_llm: bool) ->
         for tenant_id, slug in tenants:
             try:
                 counts = classify_pending(db, tenant_id, llm=llm, limit=limit)
+                demands = materialize_demands(db, tenant_id, limit=limit)
             except Exception as exc:
                 failed += 1
                 print(f"{slug}: erro ({type(exc).__name__})", file=sys.stderr)
@@ -147,7 +149,10 @@ def _classify_pending(conn: psycopg.Connection, limit: int, *, use_llm: bool) ->
                 f"{name}={counts[name]}"
                 for name in ("classified", "noise", "attach_reply", "deferred", "failed")
             )
-            print(f"{slug}: {summary}")
+            work = " ".join(
+                f"{name}={demands[name]}" for name in ("created", "attached", "skipped", "failed")
+            )
+            print(f"{slug}: {summary} | demandas: {work}")
     finally:
         db.close()
     return 1 if failed else 0

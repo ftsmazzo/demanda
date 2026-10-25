@@ -23,10 +23,15 @@ def add_message(
     minutes=0,
     media=None,
 ):
+    contact_id = conn.execute(
+        "INSERT INTO contacts (tenant_id, phone) VALUES (%s, %s) "
+        "ON CONFLICT (tenant_id, phone) DO UPDATE SET phone = EXCLUDED.phone RETURNING id",
+        (channel.tenant_id, phone),
+    ).fetchone()[0]
     row = conn.execute(
         "INSERT INTO messages (tenant_id, channel_id, provider_message_id, direction, remote_jid, "
-        "contact_phone, message_type, text, media, provider_timestamp, raw) "
-        "VALUES (%s, %s, %s, %s, %s, %s, 'conversation', %s, %s, %s, '{}'::jsonb) RETURNING id",
+        "contact_phone, message_type, text, media, provider_timestamp, raw, contact_id) "
+        "VALUES (%s, %s, %s, %s, %s, %s, 'conversation', %s, %s, %s, '{}'::jsonb, %s) RETURNING id",
         (
             channel.tenant_id,
             channel.channel_id,
@@ -37,6 +42,7 @@ def add_message(
             text,
             None if media is None else '{"mimetype": "image/jpeg"}',
             BASE + timedelta(minutes=minutes),
+            contact_id,
         ),
     )
     return row.fetchone()[0]
@@ -282,3 +288,51 @@ def test_definitive_llm_results_are_not_redone(database, admin_conn, channel):
 
     assert sum(second.values()) == 0
     assert len(all_rows(admin_conn, message)) == 1
+
+
+def test_known_employee_contact_triggers_the_internal_hr_rule(database, admin_conn, channel):
+    message = add_message(
+        admin_conn, channel, "X1", "Preciso de folga dia 30, posso?", phone="5511999990104"
+    )
+    admin_conn.execute(
+        "UPDATE contacts SET kind = 'colaborador' WHERE tenant_id = %s AND phone = %s",
+        (channel.tenant_id, "5511999990104"),
+    )
+
+    classify_pending(database, channel.tenant_id)
+
+    assert stored(admin_conn, message)[0][1] == "rh-interno"
+
+
+def _contact_of(admin_conn, message_id):
+    return admin_conn.execute(
+        "SELECT contact_id FROM messages WHERE id = %s", (message_id,)
+    ).fetchone()[0]
+
+
+def test_short_acknowledgement_with_an_open_demand_is_attached_not_noise(
+    database, admin_conn, channel
+):
+    from tests.test_core_schema import make_demand
+
+    first = add_message(admin_conn, channel, "X2", "Quando vence o DAS esse mes?", minutes=0)
+    make_demand(admin_conn, channel.tenant_id, contact_id=_contact_of(admin_conn, first))
+    ack = add_message(admin_conn, channel, "X3", "ok", minutes=5)
+
+    classify_pending(database, channel.tenant_id)
+
+    assert stored(admin_conn, ack)[0][0] == "attach_reply"
+
+
+def test_acknowledgement_after_the_demand_was_closed_is_noise(database, admin_conn, channel):
+    from tests.test_core_schema import make_demand
+
+    first = add_message(admin_conn, channel, "X4", "Quando vence o DAS esse mes?", minutes=0)
+    make_demand(
+        admin_conn, channel.tenant_id, contact_id=_contact_of(admin_conn, first), status="concluido"
+    )
+    ack = add_message(admin_conn, channel, "X5", "ok", minutes=5)
+
+    classify_pending(database, channel.tenant_id)
+
+    assert stored(admin_conn, ack)[0][0] == "noise"

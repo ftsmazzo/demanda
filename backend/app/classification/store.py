@@ -25,8 +25,13 @@ RECENT_MESSAGES = 5
 _TRANSIENT_REASONS = {"llm_unavailable", "llm_error"}
 
 _PENDING = """
-    SELECT m.id, m.channel_id, m.contact_phone, m.text, (m.media IS NOT NULL), m.provider_timestamp
-    FROM messages m
+    SELECT m.id, m.channel_id, m.contact_phone, m.text, (m.media IS NOT NULL),
+           m.provider_timestamp, ct.kind,
+           EXISTS (
+               SELECT 1 FROM demands d
+               WHERE d.contact_id = m.contact_id AND d.status <> 'concluido'
+           )
+    FROM messages m LEFT JOIN contacts ct ON ct.id = m.contact_id
     WHERE m.direction = 'in'
       AND NOT EXISTS (
           SELECT 1 FROM message_classifications c
@@ -71,11 +76,25 @@ def classify_pending(
     with db.tenant_transaction(tenant_id) as conn:
         pending = conn.execute(_PENDING, (RULES_VERSION, llm is not None, limit)).fetchall()
         work = []
-        for message_id, channel_id, phone, text, has_media, sent_at in pending:
+        for (
+            message_id,
+            channel_id,
+            phone,
+            text,
+            has_media,
+            sent_at,
+            contact_kind,
+            has_open,
+        ) in pending:
             recent = conn.execute(
                 _RECENT, (tenant_id, channel_id, phone, sent_at, RECENT_MESSAGES)
             ).fetchall()
-            context = Context(has_media=has_media, recent=tuple(row[0] for row in reversed(recent)))
+            context = Context(
+                contact_type=None if contact_kind == "desconhecido" else contact_kind,
+                has_open_demand=has_open,
+                has_media=has_media,
+                recent=tuple(row[0] for row in reversed(recent)),
+            )
             work.append((message_id, text or "", context))
 
     model = getattr(llm, "model", None)

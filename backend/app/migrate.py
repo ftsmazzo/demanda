@@ -12,8 +12,11 @@ MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 ADVISORY_LOCK_KEY = 727274  # evita corrida entre replicas subindo juntas
 
 
-def apply_migrations(database_url: str) -> list[str]:
-    """Aplica as migrations pendentes e devolve as versoes aplicadas agora."""
+def apply_migrations(database_url: str, *, up_to: str | None = None) -> list[str]:
+    """Aplica as migrations pendentes e devolve as versoes aplicadas agora.
+
+    up_to (opcional) para depois dessa versao: serve para testar migrations contra dados antigos.
+    """
     applied_now: list[str] = []
     with psycopg.connect(database_url, autocommit=True) as conn:
         conn.execute("SELECT pg_advisory_lock(%s)", (ADVISORY_LOCK_KEY,))
@@ -32,6 +35,8 @@ def apply_migrations(database_url: str) -> list[str]:
                         "INSERT INTO schema_migrations (version) VALUES (%s)", (path.stem,)
                     )
                 applied_now.append(path.stem)
+                if up_to is not None and path.stem == up_to:
+                    break
                 logger.info("migration aplicada: %s", path.stem)
         finally:
             # o lock e de sessao: se a conexao caiu ele ja foi liberado

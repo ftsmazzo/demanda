@@ -9,9 +9,9 @@ from app.ingestion.evolution import IncomingMessage
 _INSERT = """
     INSERT INTO messages (
         tenant_id, channel_id, provider_message_id, direction, remote_jid, contact_phone,
-        push_name, message_type, text, media, provider_timestamp, raw
+        push_name, message_type, text, media, provider_timestamp, raw, contact_id
     )
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     ON CONFLICT (channel_id, provider_message_id) DO NOTHING
     RETURNING id
 """
@@ -22,6 +22,7 @@ def insert_message(
     *,
     tenant_id: UUID,
     channel_id: UUID,
+    contact_id: UUID,
     message: IncomingMessage,
     raw: dict[str, Any],
 ) -> bool:
@@ -41,6 +42,7 @@ def insert_message(
             Jsonb(message.media) if message.media is not None else None,
             message.provider_timestamp,
             Jsonb(raw),
+            contact_id,
         ),
     ).fetchone()
     return row is not None

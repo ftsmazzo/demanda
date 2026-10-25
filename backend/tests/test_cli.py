@@ -206,3 +206,25 @@ def test_review_shows_only_the_latest_classification_of_each_message(
     lines = [row for row in capsys.readouterr().out.splitlines() if "xyzunico" in row]
     assert len(lines) == 1
     assert "dp/duvida" in lines[0]
+
+
+def test_classify_pending_also_turns_messages_into_demands(
+    admin_url, admin_conn, channel, monkeypatch, capsys
+):
+    from tests.test_classification_store import add_message
+
+    monkeypatch.setenv("DATABASE_URL", admin_url)
+    monkeypatch.setenv("APP_DATABASE_URL", admin_url)
+    add_message(
+        admin_conn, channel, "CD1", "Quando vence o DAS esse mes? xyzdemanda", minutes=500000
+    )
+
+    code = cli.main(["classify-pending", "--no-llm"])
+
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "created=1" in out
+    title = admin_conn.execute(
+        "SELECT title FROM demands WHERE tenant_id = %s", (channel.tenant_id,)
+    ).fetchone()[0]
+    assert "xyzdemanda" in title

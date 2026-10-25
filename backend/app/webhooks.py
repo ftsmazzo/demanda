@@ -6,6 +6,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Body, Header, HTTPException, Request
 
+from app.core.contacts import upsert_contact
 from app.db import Database
 from app.ingestion.evolution import UPSERT_EVENT, normalize_event, parse_messages_upsert
 from app.ingestion.repository import insert_message
@@ -46,10 +47,18 @@ def evolution_webhook(
     stored = 0
     with db.tenant_transaction(auth.tenant_id) as conn:
         for message, raw in result.messages:
+            contact_id = upsert_contact(
+                conn,
+                tenant_id=auth.tenant_id,
+                phone=message.contact_phone,
+                push_name=message.push_name,
+                incoming=message.direction == "in",
+            )
             if insert_message(
                 conn,
                 tenant_id=auth.tenant_id,
                 channel_id=channel_id,
+                contact_id=contact_id,
                 message=message,
                 raw=raw,
             ):
