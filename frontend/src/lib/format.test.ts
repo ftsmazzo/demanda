@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { makeCard } from "../test/fixtures";
-import { ageFill, idleBadge, idleLevel, initials, spanText, voiceSentence } from "./format";
+import { ageFill, formatPhone, idleBadge, idleLevel, initials, spanText, voiceSentence } from "./format";
 
 describe("idle time", () => {
   it.each([
@@ -100,5 +100,16 @@ describe("initials", () => {
     expect(initials("  maria  da  silva ")).toBe("MS");
     expect(initials("Ana")).toBe("A");
     expect(initials("")).toBe("?");
+  });
+});
+
+describe("formatPhone", () => {
+  it("formats Brazilian mobile and landline numbers", () => {
+    expect(formatPhone("5511999990101")).toBe("(11) 99999-0101");
+    expect(formatPhone("551133334444")).toBe("(11) 3333-4444");
+  });
+
+  it("leaves other numbers alone", () => {
+    expect(formatPhone("14155550123")).toBe("14155550123");
   });
 });

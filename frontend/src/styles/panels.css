@@ -399,3 +399,83 @@
     gap: 28px;
   }
 }
+
+/* contatos */
+.contact-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--rule);
+}
+
+.contact-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 150px 170px;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.contact-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.contact-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contact-name.muted {
+  color: var(--ink-3);
+  font-weight: 500;
+}
+
+.contact-phone {
+  color: var(--ink-2);
+  font-size: 13.5px;
+}
+
+.link-btn {
+  min-height: 32px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--azinhavre);
+  font-size: 13px;
+  font-weight: 560;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.name-edit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.name-edit .input {
+  flex: 1 1 180px;
+}
+
+.input-search {
+  width: 220px;
+}
+
+@media (max-width: 720px) {
+  .contact-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .input-search {
+    width: 100%;
+  }
+}

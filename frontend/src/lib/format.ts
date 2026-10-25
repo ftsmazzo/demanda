@@ -70,3 +70,9 @@ export function idleSentence(card: Pick<Card, "status" | "idle_hours" | "closed_
   if (card.idle_hours < 1) return "Movimentada agora";
   return `Parada há ${spanText(card.idle_hours)}`;
 }
+
+/** 5511999990101 vira (11) 99999-0101; numeros fora do padrao brasileiro ficam como vieram. */
+export function formatPhone(phone: string): string {
+  const match = /^55(\d{2})(9?\d{4})(\d{4})$/.exec(phone);
+  return match ? `(${match[1]}) ${match[2]}-${match[3]}` : phone;
+}
