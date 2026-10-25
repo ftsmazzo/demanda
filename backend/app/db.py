@@ -59,6 +59,11 @@ class Database:
     def close(self) -> None:
         self._pool.close()
 
+    def tenant_ids(self) -> list[UUID]:
+        """Ids de todos os tenants, pela funcao SECURITY DEFINER (o runtime nao le a tabela)."""
+        with self._pool.connection() as conn:
+            return [row[0] for row in conn.execute("SELECT list_tenant_ids()").fetchall()]
+
     def ping(self) -> bool:
         try:
             with self._pool.connection() as conn:

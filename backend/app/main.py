@@ -14,6 +14,8 @@ from app.api.demand_writes import router as demand_writes_router
 from app.api.demands import router as demands_router
 from app.api.deps import AuthSettings
 from app.api.people import router as people_router
+from app.classification.factory import build_classifier
+from app.classification.llm import LLMClassifier
 from app.db import DEFAULT_APP_ROLE, Database
 from app.limits import BodyLimitMiddleware
 from app.migrate import apply_migrations
@@ -21,6 +23,7 @@ from app.provisioning import create_runtime_role
 from app.security.throttle import LoginThrottle
 from app.spa import add_security_headers, mount_spa
 from app.webhooks import router as webhooks_router
+from app.worker import BackgroundWorker
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +43,8 @@ def create_app(
     jwt_secret: str | None = None,
     token_ttl_seconds: int = DEFAULT_TOKEN_TTL_SECONDS,
     static_dir: str | Path | None = None,
+    worker_interval_seconds: float | None = None,
+    classifier: LLMClassifier | None = None,
 ) -> FastAPI:
     """database_url: conexao de runtime. admin_url: dono do schema, so para migrations."""
     db = Database(database_url, app_role=app_role, max_size=pool_max) if database_url else None
@@ -54,9 +59,15 @@ def create_app(
                     with psycopg.connect(owner_url, autocommit=True) as conn:
                         create_runtime_role(conn, password=runtime_password)
             db.open()
+        worker = None
+        if db is not None and worker_interval_seconds:
+            worker = BackgroundWorker(db, classifier, interval_seconds=worker_interval_seconds)
+            worker.start()
         try:
             yield
         finally:
+            if worker is not None:
+                worker.stop()
             if db is not None:
                 db.close()
 
@@ -98,6 +109,10 @@ def create_app(
 
 
 _admin_url = os.environ.get("DATABASE_URL")
+_worker_interval = float(os.environ.get("WORKER_INTERVAL_SECONDS", "0"))
+_classifier, _classifier_note = build_classifier(os.environ) if _worker_interval else (None, "")
+if _worker_interval:
+    logger.warning("worker ligado a cada %ss: %s", _worker_interval, _classifier_note)
 app = create_app(
     os.environ.get("APP_DATABASE_URL") or _admin_url,
     admin_url=_admin_url,
@@ -109,4 +124,6 @@ app = create_app(
     static_dir=os.environ.get("STATIC_DIR"),
     jwt_secret=os.environ.get("JWT_SECRET") or None,
     token_ttl_seconds=int(os.environ.get("TOKEN_TTL_MINUTES", "480")) * 60,
+    worker_interval_seconds=_worker_interval or None,
+    classifier=_classifier,
 )

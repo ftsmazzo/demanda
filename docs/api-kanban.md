@@ -74,6 +74,10 @@ curl -s -X POST https://demanda-api.kxryyk.easypanel.host/api/v1/auth/login -H '
 curl -s https://demanda-api.kxryyk.easypanel.host/api/v1/board -H 'Authorization: Bearer TOKEN'
 ```
 
+## Processamento automatico
+
+Com `WORKER_INTERVAL_SECONDS` (por exemplo `30`) a propria API roda um ciclo em segundo plano: classifica as mensagens novas (regras e, se houver chave, IA) e abre ou atualiza as demandas de cada tenant. Sem a variavel, so o `classify-pending` manual faz isso. Use uma unica replica da API.
+
 ## Limitacoes conhecidas
 
 - A interface web (`frontend/`) e servida pela propria API a partir de `STATIC_DIR` (a imagem Docker ja a embute em `/app/static`). Mesma origem, sem CORS.
