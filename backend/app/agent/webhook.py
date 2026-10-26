@@ -11,6 +11,8 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Body, Header, HTTPException, Request
 
 from app.agent.inbound import handle_inbound
+from app.agent.nl.llm import IntentLLM
+from app.agent.nl.service import DEFAULT_DAILY_CAP
 from app.agent.sender import MessageSender
 from app.db import Database
 from app.ingestion.evolution import UPSERT_EVENT, normalize_event, parse_messages_upsert
@@ -29,10 +31,20 @@ class AgentRuntime:
     sender: MessageSender
     secret_hash: str
     app_url: str
+    intent_llm: IntentLLM | None = None
+    nl_daily_cap: int = DEFAULT_DAILY_CAP
 
 
-def make_runtime(sender: MessageSender, secret: str, app_url: str) -> AgentRuntime:
-    return AgentRuntime(sender, sha256(secret.encode()).hexdigest(), app_url)
+def make_runtime(
+    sender: MessageSender,
+    secret: str,
+    app_url: str,
+    intent_llm: IntentLLM | None = None,
+    nl_daily_cap: int = DEFAULT_DAILY_CAP,
+) -> AgentRuntime:
+    return AgentRuntime(
+        sender, sha256(secret.encode()).hexdigest(), app_url, intent_llm, nl_daily_cap
+    )
 
 
 def phone_variants(phone: str) -> list[str]:
@@ -92,6 +104,8 @@ def agent_webhook(
             text=message.text,
             app_url=runtime.app_url,
             now=datetime.now(UTC),
+            intent_llm=runtime.intent_llm,
+            nl_daily_cap=runtime.nl_daily_cap,
         )
         handled += reply is not None
     return {"handled": handled}

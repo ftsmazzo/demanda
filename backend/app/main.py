@@ -9,6 +9,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from psycopg_pool import PoolTimeout
 
+from app.agent.nl.llm import IntentLLM, build_intent_llm
+from app.agent.nl.service import DEFAULT_DAILY_CAP as NL_DAILY_CAP
 from app.agent.sender import MessageSender, build_sender
 from app.agent.webhook import make_runtime
 from app.agent.webhook import router as agent_webhook_router
@@ -62,6 +64,8 @@ def create_app(
     agent_webhook_secret: str | None = None,
     case_llm: CaseLLM | None = None,
     case_daily_cap: int = DEFAULT_DAILY_CAP,
+    intent_llm: IntentLLM | None = None,
+    nl_daily_cap: int = NL_DAILY_CAP,
 ) -> FastAPI:
     """database_url: conexao de runtime. admin_url: dono do schema, so para migrations."""
     db = Database(database_url, app_role=app_role, max_size=pool_max) if database_url else None
@@ -118,7 +122,7 @@ def create_app(
     )
     app.state.db = db
     app.state.agent = (
-        make_runtime(agent_sender, agent_webhook_secret, agent_app_url)
+        make_runtime(agent_sender, agent_webhook_secret, agent_app_url, intent_llm, nl_daily_cap)
         if agent_sender is not None and agent_webhook_secret
         else None
     )
@@ -162,6 +166,9 @@ _evolution = (
 _agent_sender = build_sender(os.environ, _evolution)
 if _agent_sender is not None:
     logger.warning("agente dos socios ligado em modo %s", _agent_sender.mode)
+_intent_llm, _intent_note = build_intent_llm(os.environ) if _agent_sender else (None, "")
+if _agent_sender is not None:
+    logger.warning("%s", _intent_note)
 _worker_interval = float(os.environ.get("WORKER_INTERVAL_SECONDS", "0"))
 _classifier, _classifier_note = build_classifier(os.environ) if _worker_interval else (None, "")
 if _worker_interval:
@@ -188,5 +195,7 @@ app = create_app(
     agent_webhook_secret=os.environ.get("AGENT_WEBHOOK_SECRET") or None,
     case_llm=_case_llm,
     case_daily_cap=int(os.environ.get("CASE_DAILY_CAP", str(DEFAULT_DAILY_CAP))),
+    intent_llm=_intent_llm,
+    nl_daily_cap=int(os.environ.get("AGENT_NL_DAILY_CAP", str(NL_DAILY_CAP))),
     health_interval_seconds=float(os.environ.get("HEALTH_INTERVAL_SECONDS", "60")),
 )

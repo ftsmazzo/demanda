@@ -36,6 +36,7 @@ def test_it_reports_what_is_off_and_never_prints_secrets(
 
     assert code == 0
     assert "worker: desligado" in out
+    assert "linguagem natural desligada" in out
     assert "agente: desligado" in out and "AGENT_INSTANCE" in out
     assert "destinatarios ativos: 0" in out
 
@@ -59,6 +60,7 @@ def test_it_describes_a_working_setup(admin_url, admin_conn, tenant_id, monkeypa
 
     assert code == 0
     assert "worker: ligado a cada 30s" in out
+    assert "linguagem natural via OpenRouter" in out
     assert "IA de caso: ligada" in out
     assert "ENVIO REAL" in out
     assert "segredo do webhook: definido" in out

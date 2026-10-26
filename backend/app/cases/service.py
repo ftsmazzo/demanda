@@ -89,8 +89,8 @@ def _event(
 def _reserve_call(conn: psycopg.Connection, tenant_id: UUID, day: date, cap: int) -> bool:
     """Conta uma chamada de IA no dia. Falso quando o teto do dia ja foi atingido."""
     row = conn.execute(
-        "INSERT INTO ai_usage (tenant_id, day, calls) VALUES (%s, %s, 1) "
-        "ON CONFLICT (tenant_id, day) DO UPDATE SET calls = ai_usage.calls + 1 "
+        "INSERT INTO ai_usage (tenant_id, day, purpose, calls) VALUES (%s, %s, 'case', 1) "
+        "ON CONFLICT (tenant_id, day, purpose) DO UPDATE SET calls = ai_usage.calls + 1 "
         "WHERE ai_usage.calls < %s RETURNING calls",
         (tenant_id, day, cap),
     ).fetchone()

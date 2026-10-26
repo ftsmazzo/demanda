@@ -19,6 +19,9 @@ from app.agent.messages import (
     unknown_text,
     when_text,
 )
+from app.agent.nl import actions as nl_actions
+from app.agent.nl.llm import IntentLLM
+from app.agent.nl.service import DEFAULT_DAILY_CAP, natural_reply
 from app.agent.runner import stuck_items
 from app.agent.sender import MessageSender, SendError
 from app.core.appointments import _tenant_zone
@@ -74,8 +77,11 @@ def _agenda(conn: psycopg.Connection, zone, app_url: str, now: datetime) -> str:
     return agenda_text(today, tomorrow, app_url)
 
 
-def _respond(conn, command: str, recipient_id, zone, app_url: str, now: datetime) -> str:
+def _respond(conn, tenant_id, command: str, recipient_id, zone, app_url: str, now: datetime) -> str:
     if command in ("confirm", "cancel"):
+        pending = nl_actions.resolve_pending(conn, tenant_id, recipient_id, command, now, app_url)
+        if pending is not None:
+            return pending
         return _answer_appointment(conn, command, recipient_id, zone, app_url)
     if command == "stuck":
         items = stuck_items(conn, now, STUCK_MINIMUM_HOURS, 5)
@@ -115,10 +121,13 @@ def handle_inbound(
     text: str,
     app_url: str,
     now: datetime,
+    intent_llm: IntentLLM | None = None,
+    nl_daily_cap: int = DEFAULT_DAILY_CAP,
 ) -> str | None:
     """Executa o pedido do socio e responde. Devolve o texto enviado, ou None se nao respondeu
     (mensagem ja tratada ou limite diario de respostas)."""
     command = parse_command(text)
+    use_nl = command == "unknown" and intent_llm is not None
     with db.tenant_transaction(tenant_id) as conn:
         recent = conn.execute(
             "SELECT count(*) FROM agent_notifications WHERE recipient_id = %s AND kind = 'reply' "
@@ -136,10 +145,27 @@ def handle_inbound(
         if claimed is None:
             return None  # reentrega do mesmo webhook: ja foi tratada
         zone = _tenant_zone(conn, tenant_id)
-        reply = _respond(conn, command, recipient_id, zone, app_url, now)
-        conn.execute("UPDATE agent_notifications SET body = %s WHERE id = %s", (reply, claimed[0]))
+        reply = (
+            None if use_nl else _respond(conn, tenant_id, command, recipient_id, zone, app_url, now)
+        )
+        if reply is not None:
+            conn.execute(
+                "UPDATE agent_notifications SET body = %s WHERE id = %s", (reply, claimed[0])
+            )
         phone = conn.execute(
             "SELECT phone FROM agent_recipients WHERE id = %s", (recipient_id,)
         ).fetchone()[0]
+    if use_nl:
+        try:
+            reply = natural_reply(
+                db, tenant_id, recipient_id, intent_llm, text, app_url, now, nl_daily_cap
+            )
+        except Exception:
+            logger.exception("agente em linguagem natural falhou")
+            reply = unknown_text()
+        with db.tenant_transaction(tenant_id) as conn:
+            conn.execute(
+                "UPDATE agent_notifications SET body = %s WHERE id = %s", (reply, claimed[0])
+            )
     _send_reply(db, tenant_id, sender, claimed[0], phone, reply, now)
     return reply

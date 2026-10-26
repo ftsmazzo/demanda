@@ -10,6 +10,7 @@ from datetime import datetime
 
 import psycopg
 
+from app.agent.nl.llm import build_intent_llm
 from app.agent.runner import DAILY_CAP, QUIET_BEFORE, QUIET_FROM
 from app.cases.llm import build_case_llm
 from app.classification.factory import build_classifier
@@ -448,6 +449,8 @@ def _config_lines() -> list[str]:
         lines.append("agente: ligado em modo ENVIO REAL")
     else:
         lines.append("agente: ligado em modo ENSAIO (nada e enviado; use AGENT_SEND=1 para enviar)")
+    nl_llm, nl_note = build_intent_llm(env)
+    lines.append(f"{nl_note}" if nl_llm else f"agente: {nl_note}")
     secret = "definido" if env.get("AGENT_WEBHOOK_SECRET") else "NAO definido"
     lines.append(f"segredo do webhook: {secret}")
     return lines

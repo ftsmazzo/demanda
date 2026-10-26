@@ -124,6 +124,12 @@ Ele cria a empresa, o canal ligado a instancia, o socio e o destinatario do agen
 - **Consultoria** e um setor como os outros (`consultoria`): pareceres, planejamento, diagnosticos e analises para a empresa do cliente. Entra nas regras, nos prompts de IA, nos filtros e no cadastro de usuarios (`--sector consultoria`).
 - **Cliente prioritario** e uma marca no contato (`PATCH /api/v1/contacts/{id}` com `{"priority": true}`, socio e gestor; ou a estrela na lista de Contatos). Efeitos: a demanda nunca nasce abaixo de urgencia "alta" (regras e IA de caso); no quadro vem na frente das demais da mesma urgencia e ganha a etiqueta "Prioritario"; `GET /api/v1/board?priority=true` (e `/demands`) filtra so esses clientes (botao "So prioritarios"); o alerta de demanda parada chega com 24 h em vez de 72 h e o texto marca "cliente prioritario".
 
+## Agente em linguagem natural
+
+Alem dos comandos curtos, o socio pode escrever livremente para a Secretaria: "o que a Ana tem pendente?", "o que esta parado no fiscal?", "agenda da semana", "como estamos?", "cria uma tarefa para o Bruno: conferir a folha do Mercado Bom Preco ate sexta", "passa a folha de outubro para a Ana", "conclui a guia do DAS", "marca a Padaria como prioritaria". Desenho completo em `docs/agente-linguagem-natural.md`.
+
+A IA so identifica a intencao e os nomes citados; consultas, listas, contas de data e textos vem do codigo e do SQL. Consultas respondem na hora; alteracoes (criar tarefa, atribuir, mudar situacao, prioridade) viram uma proposta guardada por 15 minutos e so o `1` executa (o `2` cancela). Nome que combina com mais de uma pessoa, cliente ou demanda gera uma lista e um pedido de mais detalhe, nunca um palpite. Tudo o que o agente altera entra no historico do caso (ator `user`, via `agente`). Liga sozinho com o agente e uma chave de IA; `AGENT_NL=off` desliga; `AGENT_NL_DAILY_CAP` limita as chamadas por dia (100). `agent-check` mostra o estado.
+
 ## Limitacoes conhecidas
 
 - A interface web (`frontend/`) e servida pela propria API a partir de `STATIC_DIR` (a imagem Docker ja a embute em `/app/static`). Mesma origem, sem CORS.

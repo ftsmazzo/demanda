@@ -120,3 +120,31 @@ def test_a_brazilian_number_with_or_without_the_ninth_digit_is_the_same_person(
 
     assert len(sender.sent) == 1
     assert sender.sent[0][0] == phone
+
+
+def test_a_free_text_message_goes_through_the_natural_language_agent(
+    admin_url, admin_conn, tenant_id
+):
+    from tests.nl_helpers import FakeIntentLLM, intent
+
+    phone = fresh_phone()
+    add_recipient(admin_conn, tenant_id, phone)
+    sender = FakeSender()
+    llm = FakeIntentLLM(intent("summary"))
+    app = create_app(
+        admin_url,
+        agent_sender=sender,
+        agent_webhook_secret=SECRET,
+        agent_app_url="https://x.example",
+        agent_interval_seconds=3600,
+        intent_llm=llm,
+    )
+
+    with TestClient(app) as client:
+        client.post(
+            "/webhooks/agent",
+            json=payload("como estamos hoje?", phone=phone, message_id="WA-NL"),
+            headers={"X-Webhook-Secret": SECRET},
+        )
+
+    assert llm.calls and "Resumo agora" in sender.sent[0][1]
