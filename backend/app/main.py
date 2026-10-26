@@ -10,6 +10,8 @@ from fastapi.responses import JSONResponse
 from psycopg_pool import PoolTimeout
 
 from app.agent.sender import MessageSender, build_sender
+from app.agent.webhook import make_runtime
+from app.agent.webhook import router as agent_webhook_router
 from app.api.appointments import router as appointments_router
 from app.api.auth import router as auth_router
 from app.api.channels import router as channels_router
@@ -55,6 +57,7 @@ def create_app(
     agent_sender: MessageSender | None = None,
     agent_app_url: str = "",
     agent_interval_seconds: float = 60,
+    agent_webhook_secret: str | None = None,
 ) -> FastAPI:
     """database_url: conexao de runtime. admin_url: dono do schema, so para migrations."""
     db = Database(database_url, app_role=app_role, max_size=pool_max) if database_url else None
@@ -104,10 +107,16 @@ def create_app(
         openapi_url=None,
     )
     app.state.db = db
+    app.state.agent = (
+        make_runtime(agent_sender, agent_webhook_secret, agent_app_url)
+        if agent_sender is not None and agent_webhook_secret
+        else None
+    )
     app.state.auth = AuthSettings(jwt_secret, token_ttl_seconds, LoginThrottle())
     app.add_middleware(BodyLimitMiddleware, max_bytes=max_body_bytes)
     add_security_headers(app)
     app.include_router(webhooks_router)
+    app.include_router(agent_webhook_router)
     app.include_router(auth_router)
     app.include_router(demands_router)
     app.include_router(demand_writes_router)
@@ -163,5 +172,6 @@ app = create_app(
     evolution=_evolution,
     agent_sender=_agent_sender,
     agent_app_url=os.environ.get("AGENT_APP_URL", ""),
+    agent_webhook_secret=os.environ.get("AGENT_WEBHOOK_SECRET") or None,
     health_interval_seconds=float(os.environ.get("HEALTH_INTERVAL_SECONDS", "60")),
 )

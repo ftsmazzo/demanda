@@ -97,7 +97,9 @@ def _plan_appointments(conn, tenant_id, recipients, zone, app_url, now) -> None:
             _enqueue(conn, tenant_id, recipient_id, "appointment", str(appointment_id), body, now)
 
 
-def _stuck(conn: psycopg.Connection, now: datetime, minimum: int, limit: int) -> list[StuckItem]:
+def stuck_items(
+    conn: psycopg.Connection, now: datetime, minimum: int, limit: int
+) -> list[StuckItem]:
     rows = conn.execute(
         f"SELECT d.title, d.sector, {_IDLE} AS idle FROM demands d "
         "WHERE d.status <> 'concluido' AND "
@@ -128,7 +130,7 @@ def _summary_data(conn: psycopg.Connection, zone: ZoneInfo, now: datetime) -> Su
             (end, end + timedelta(days=1)),
         )
     ]
-    stuck = _stuck(conn, now, STUCK_SUMMARY_HOURS, 3)
+    stuck = stuck_items(conn, now, STUCK_SUMMARY_HOURS, 3)
     return SummaryData(local.date(), created, closed, open_total, critical, stuck, tomorrow)
 
 
@@ -149,7 +151,7 @@ def _plan_stuck(conn, tenant_id, recipients, zone, app_url, now) -> None:
     missing = _missing(conn, recipients, "stuck", key)
     if not missing:
         return
-    items = _stuck(conn, now, STUCK_ALERT_HOURS, 5)
+    items = stuck_items(conn, now, STUCK_ALERT_HOURS, 5)
     body = stuck_text(items, app_url) if items else ""
     for recipient_id, _ in missing:
         _enqueue(conn, tenant_id, recipient_id, "stuck", key, body, now)
@@ -158,7 +160,7 @@ def _plan_stuck(conn, tenant_id, recipients, zone, app_url, now) -> None:
 _NEXT_DELIVERY = (
     "SELECT n.id, n.body, r.phone FROM agent_notifications n "
     "JOIN agent_recipients r ON r.id = n.recipient_id AND r.active "
-    "WHERE n.status IN ('pending', 'failed') AND n.attempts < %s "
+    "WHERE n.status IN ('pending', 'failed') AND n.kind <> 'reply' AND n.attempts < %s "
     "AND (n.last_attempt_at IS NULL OR n.last_attempt_at <= %s) "
     "ORDER BY n.created_at, n.id LIMIT 1 FOR UPDATE OF n SKIP LOCKED"
 )

@@ -94,6 +94,10 @@ Os numeros vem de consultas SQL e o texto e montado por modelos: a IA nao escrev
 
 Sem `AGENT_SEND=1` o agente trabalha em **ensaio**: grava o texto e marca `dry_run`, sem enviar. Veja o que ele diria com `python -m app.cli agent-outbox --tenant-slug SLUG`. Cadastro: `add-recipient --tenant-slug SLUG --name NOME --phone 5511999990101 [--user-email EMAIL]`, `recipients`, `remove-recipient`.
 
+### Respostas pelo WhatsApp
+
+Com `AGENT_WEBHOOK_SECRET`, a instancia do agente passa a enviar suas mensagens recebidas para `POST /webhooks/agent` (evento `MESSAGES_UPSERT`, cabecalho `X-Webhook-Secret`). Quem escreve e identificado pelo telefone: so destinatarios cadastrados sao atendidos; numero desconhecido ou cadastrado em mais de uma empresa e ignorado em silencio. Comandos: `1` confirma e `2` cancela o compromisso mais recente ainda proposto que o agente avisou; `parado`/`pendencias` lista as demandas paradas ha 24 h ou mais; `agenda` mostra hoje e amanha; `ajuda` explica. Qualquer outro texto recebe "nao entendi" e nada e alterado (confirmar so vale com a palavra ou o numero sozinhos). Cada resposta e registrada na caixa de saida (`kind reply`), uma por mensagem recebida, no maximo 60 por pessoa em 24 h.
+
 ## Limitacoes conhecidas
 
 - A interface web (`frontend/`) e servida pela propria API a partir de `STATIC_DIR` (a imagem Docker ja a embute em `/app/static`). Mesma origem, sem CORS.

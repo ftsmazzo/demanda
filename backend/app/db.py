@@ -65,6 +65,12 @@ class Database:
         with self._pool.connection() as conn:
             return [row[0] for row in conn.execute("SELECT list_tenant_ids()").fetchall()]
 
+    def agent_recipients_by_phone(self, phone: str) -> list[tuple[UUID, UUID]]:
+        """(recipient_id, tenant_id) dos destinatarios ativos com este telefone."""
+        with self._pool.connection() as conn:
+            rows = conn.execute("SELECT id, tenant_id FROM agent_recipients_by_phone(%s)", (phone,))
+            return [(row[0], row[1]) for row in rows.fetchall()]
+
     def list_channels(self) -> list[tuple[Any, ...]]:
         """(id, tenant_id, instance_name, listen_groups, health_state, last_reconciled_at)."""
         with self._pool.connection() as conn:
