@@ -16,7 +16,7 @@ function handlersFor(me: Me, extra: Handlers = {}): Handlers {
 }
 
 async function openDialog(me: Me, extra: Handlers = {}) {
-  const view = renderApp(<AppRoutes />, { signedIn: true, handlers: handlersFor(me, extra) });
+  const view = renderApp(<AppRoutes />, { route: "/quadro", signedIn: true, handlers: handlersFor(me, extra) });
   await userEvent.click(await screen.findByRole("button", { name: "Nova demanda" }));
   const box = await screen.findByRole("dialog", { name: "Nova demanda" });
   return { ...view, box };

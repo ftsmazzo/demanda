@@ -77,7 +77,7 @@ describe("conversation page", () => {
   it("is not available to a colaborador", async () => {
     open({}, COLABORADOR);
 
-    expect(await screen.findByRole("heading", { name: "Novas" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Hoje", current: "page" })).toBeInTheDocument();
     expect(screen.queryByRole("log", { name: "Conversa" })).not.toBeInTheDocument();
   });
 

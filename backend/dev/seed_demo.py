@@ -328,6 +328,16 @@ def _seed_cases(conn: psycopg.Connection, tenant) -> None:
             (tenant, demand, contact),
         )
         conn.execute(
+            "INSERT INTO appointments (tenant_id, demand_id, contact_id, title, starts_at, status) "
+            "VALUES (%s, %s, %s, 'Alinhamento do balancete', "
+            "date_trunc('day', now()) + interval '1 day 14 hours', 'confirmed'), "
+            "(%s, %s, %s, 'Ligacao sobre o DAS', "
+            "date_trunc('day', now()) + interval '2 days 14 hours 30 minutes', 'confirmed'), "
+            "(%s, %s, %s, 'Visita ao cliente', "
+            "date_trunc('day', now()) + interval '4 days 9 hours', 'proposed')",
+            (tenant, demand, contact, tenant, demand, contact, tenant, demand, contact),
+        )
+        conn.execute(
             "UPDATE demands SET needs_review = true, review_reason = 'confirmar agrupamento' WHERE id = %s",
             (rows[3][0],),
         )

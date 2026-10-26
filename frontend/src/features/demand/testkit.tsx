@@ -28,7 +28,7 @@ export function setup(me: Me = SOCIO, current: Detail = detail(), extra: Handler
     "GET /api/v1/demands/d1": () => [200, current],
     ...extra,
   };
-  return renderApp(<AppRoutes />, { route: "/?demanda=d1", signedIn: true, handlers });
+  return renderApp(<AppRoutes />, { route: "/quadro?demanda=d1", signedIn: true, handlers });
 }
 
 /** Abre a gaveta e espera o carregamento terminar. */

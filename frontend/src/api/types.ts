@@ -192,3 +192,20 @@ export interface Appointment {
   sector: Sector;
   contact: ContactRef | null;
 }
+
+export interface TodayData {
+  needs_review: Card[];
+  to_confirm: Appointment[];
+  attention: Card[];
+  waiting_triage: number;
+  counts: { open: number; meetings_today: number };
+}
+
+export interface ConversationSummary {
+  contact: ContactRef;
+  last_text: string | null;
+  last_direction: "in" | "out";
+  last_at: string;
+  open_items: number;
+  waiting: number;
+}

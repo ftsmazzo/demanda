@@ -6,6 +6,8 @@ import type {
   BoardFilters,
   ChannelHealth,
   Conversation,
+  ConversationSummary,
+  TodayData,
   ContactKind,
   ContactRef,
   DemandCreate,
@@ -48,7 +50,15 @@ export function createApi(client: Client) {
     patchSubtask: (id: string, patch: { title?: string; done?: boolean }) =>
       request<Subtask>("PATCH", `/api/v1/subtasks/${safeId(id)}`, patch),
     channelsHealth: () => request<ChannelHealth[]>("GET", "/api/v1/channels/health"),
-    appointments: () => request<Appointment[]>("GET", "/api/v1/appointments"),
+    appointments: (range: { since?: string; until?: string; status?: AppointmentStatus } = {}) =>
+      request<Appointment[]>("GET", "/api/v1/appointments", undefined, {
+        query: { since: range.since, until: range.until, status: range.status, limit: 200 },
+      }),
+    today: () => request<TodayData>("GET", "/api/v1/today"),
+    conversations: (filters: { q?: string; waiting?: boolean } = {}) =>
+      request<ConversationSummary[]>("GET", "/api/v1/conversations", undefined, {
+        query: { q: filters.q, waiting: filters.waiting ? "true" : undefined },
+      }),
     patchAppointment: (
       id: string,
       patch: { status?: AppointmentStatus; starts_at?: string; all_day?: boolean },

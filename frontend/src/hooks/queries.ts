@@ -63,12 +63,13 @@ export function useChannelHealth(enabled: boolean) {
   });
 }
 
-export function useAppointments() {
+export function useAppointments(range: { since?: string; until?: string } = {}) {
   const { api } = useAuth();
   return useQuery({
-    queryKey: ["appointments"],
-    queryFn: () => api.appointments(),
+    queryKey: ["appointments", range.since ?? "", range.until ?? ""],
+    queryFn: () => api.appointments(range),
     refetchInterval: 60_000,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -78,7 +79,10 @@ export function usePatchAppointment() {
   return useMutation({
     mutationFn: ({ id, ...patch }: { id: string; status?: AppointmentStatus; starts_at?: string; all_day?: boolean }) =>
       api.patchAppointment(id, patch),
-    onSettled: () => void queryClient.invalidateQueries({ queryKey: ["appointments"] }),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ["appointments"] });
+      void queryClient.invalidateQueries({ queryKey: ["today"] });
+    },
   });
 }
 
@@ -88,6 +92,26 @@ export function useConversation(contactId: string | undefined) {
     queryKey: ["conversation", contactId],
     queryFn: () => api.conversation(contactId as string),
     enabled: Boolean(contactId),
+    refetchInterval: 30_000,
+  });
+}
+
+export function useToday() {
+  const { api } = useAuth();
+  return useQuery({
+    queryKey: ["today"],
+    queryFn: () => api.today(),
+    refetchInterval: 30_000,
+  });
+}
+
+export function useConversations(q: string, waiting: boolean, enabled = true) {
+  const { api } = useAuth();
+  return useQuery({
+    queryKey: ["conversations", q, waiting],
+    queryFn: () => api.conversations({ q, waiting }),
+    enabled,
+    placeholderData: keepPreviousData,
     refetchInterval: 30_000,
   });
 }

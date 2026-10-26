@@ -11,6 +11,7 @@ import "./styles/base.css";
 import "./styles/board.css";
 import "./styles/panels.css";
 import "./styles/screens.css";
+import "./styles/flow.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {

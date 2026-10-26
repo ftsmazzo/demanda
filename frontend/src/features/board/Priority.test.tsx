@@ -9,6 +9,7 @@ const vip = { id: "c-vip", name: "Mercado Bom Preço", phone: "5511999990109", k
 
 function open() {
   return renderApp(<AppRoutes />, {
+    route: "/quadro",
     signedIn: true,
     handlers: {
       "GET /api/v1/me": () => [200, SOCIO],

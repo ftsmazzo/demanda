@@ -1,40 +1,33 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppRoutes } from "../../App";
 import type { Appointment, Me } from "../../api/types";
 import { COLABORADOR, SOCIO, makeBoard, makeDetail } from "../../test/fixtures";
 import { renderApp, type Handlers } from "../../test/utils";
 
-const inDays = (days: number, hour = 17) => {
-  const date = new Date();
-  date.setUTCDate(date.getUTCDate() + days);
-  date.setUTCHours(hour, 0, 0, 0);
-  return date.toISOString();
-};
+// segunda-feira 26/10/2026, 12:00 em Sao Paulo
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-26T15:00:00Z"));
+});
+afterEach(() => vi.useRealTimers());
 
-const reuniao: Appointment = {
+const base: Appointment = {
   id: "a1",
-  title: "Vamos marcar uma reunião para definir o projeto IE",
-  starts_at: inDays(2),
+  title: "Reunião do projeto IE",
+  starts_at: "2026-10-28T17:00:00Z", // quarta 14:00
   all_day: false,
   status: "proposed",
   demand_id: "d1",
   sector: "societario",
   contact: { id: "c1", name: "Poli", phone: "5511999990101", kind: "cliente", priority: false },
 };
-const confirmada: Appointment = {
-  ...reuniao,
-  id: "a2",
-  title: "Visita ao cliente",
-  status: "confirmed",
-  all_day: true,
-  contact: null,
-};
+const allDay: Appointment = { ...base, id: "a2", title: "Visita ao cliente", all_day: true, status: "confirmed", starts_at: "2026-10-29T03:00:00Z", contact: null };
 
-function open(list: Appointment[], me: Me = SOCIO, extra: Handlers = {}) {
+function open(list: Appointment[], me: Me = SOCIO, extra: Handlers = {}, route = "/agenda") {
   return renderApp(<AppRoutes />, {
-    route: "/agenda",
+    route,
     signedIn: true,
     handlers: {
       "GET /api/v1/me": () => [200, me],
@@ -46,74 +39,125 @@ function open(list: Appointment[], me: Me = SOCIO, extra: Handlers = {}) {
   });
 }
 
-const patchedBody = (calls: { key: string; body: unknown }[], key: string) =>
-  calls.find((call) => call.key === key)?.body;
+const patched = (calls: { key: string; body: unknown }[], key: string) => calls.find((c) => c.key === key)?.body;
 
-describe("agenda page", () => {
-  it("lists upcoming appointments by day with time, contact and state", async () => {
-    open([reuniao, confirmada]);
+describe("agenda: week", () => {
+  it("opens on the current week with each appointment on its day and time", async () => {
+    open([base]);
 
-    const first = (await screen.findByText(reuniao.title)).closest("li")!;
-    expect(within(first).getByText("14:00")).toBeInTheDocument();
-    expect(within(first).getByText("Poli")).toBeInTheDocument();
-    expect(within(first).getByText("Proposto")).toBeInTheDocument();
-    const second = screen.getByText("Visita ao cliente").closest("li")!;
-    expect(within(second).getByText("O dia todo")).toBeInTheDocument();
-    expect(within(second).getByText("Confirmado")).toBeInTheDocument();
+    expect(await screen.findByText("26 de outubro a 1 de novembro de 2026")).toBeInTheDocument();
+    const wednesday = screen.getByRole("group", { name: "quarta-feira, 28/10" });
+    const event = within(wednesday).getByRole("button", { name: /14:00 Reunião do projeto IE/ });
+    expect(event).toHaveAttribute("data-status", "proposed");
+    expect(within(screen.getByRole("group", { name: "terça-feira, 27/10" })).queryByRole("button")).not.toBeInTheDocument();
   });
 
-  it("confirms a proposed appointment", async () => {
+  it("puts all-day appointments in their own strip", async () => {
+    open([allDay]);
+
+    const thursday = await screen.findByRole("group", { name: "quinta-feira, 29/10 o dia todo" });
+
+    expect(within(thursday).getByRole("button", { name: /Visita ao cliente/ })).toBeInTheDocument();
+  });
+
+  it("asks the server only for the visible week and moves forward and back", async () => {
+    const { calls } = open([base]);
+    await screen.findByText("26 de outubro a 1 de novembro de 2026");
+
+    await userEvent.click(screen.getByRole("button", { name: "Semana seguinte" }));
+
+    expect(await screen.findByText("2 a 8 de novembro de 2026")).toBeInTheDocument();
+    const last = calls.filter((c) => c.key === "GET /api/v1/appointments").at(-1)!;
+    expect(last.url.searchParams.get("since")).toContain("2026-11-02");
+    await userEvent.click(screen.getByRole("button", { name: "Hoje" }));
+    expect(await screen.findByText("26 de outubro a 1 de novembro de 2026")).toBeInTheDocument();
+  });
+
+  it("says when the week is empty", async () => {
+    open([]);
+
+    expect(await screen.findByText("Semana sem compromissos.")).toBeInTheDocument();
+  });
+});
+
+describe("agenda: details and actions", () => {
+  it("shows the selected appointment and confirms it", async () => {
     const key = "PATCH /api/v1/appointments/a1";
-    const { calls } = open([reuniao], SOCIO, { [key]: ({ body }) => [200, { ...reuniao, ...body }] });
+    const { calls } = open([base], SOCIO, { [key]: ({ body }) => [200, { ...base, ...(body as object) }] });
 
-    await userEvent.click(await screen.findByRole("button", { name: "Confirmar" }));
+    await userEvent.click(await screen.findByRole("button", { name: /14:00 Reunião do projeto IE/ }));
+    const panel = screen.getByRole("region", { name: "Compromisso selecionado" });
+    expect(within(panel).getByText("quarta-feira, 28/10 às 14:00")).toBeInTheDocument();
+    expect(within(panel).getByText("Poli")).toBeInTheDocument();
+    await userEvent.click(within(panel).getByRole("button", { name: "Confirmar" }));
 
-    await waitFor(() => expect(patchedBody(calls, key)).toEqual({ status: "confirmed" }));
+    await waitFor(() => expect(patched(calls, key)).toEqual({ status: "confirmed" }));
   });
 
-  it("cancels an appointment", async () => {
+  it("cancels, and a colaborador can only look", async () => {
     const key = "PATCH /api/v1/appointments/a2";
-    const { calls } = open([confirmada], SOCIO, { [key]: ({ body }) => [200, { ...confirmada, ...body }] });
-
-    await userEvent.click(await screen.findByRole("button", { name: "Cancelar" }));
-
-    await waitFor(() => expect(patchedBody(calls, key)).toEqual({ status: "cancelled" }));
-  });
-
-  it("only offers Confirmar on proposed appointments", async () => {
-    open([confirmada]);
-    await screen.findByText("Visita ao cliente");
-
-    expect(screen.queryByRole("button", { name: "Confirmar" })).not.toBeInTheDocument();
+    const { calls } = open([allDay], SOCIO, { [key]: ({ body }) => [200, { ...allDay, ...(body as object) }] });
+    await userEvent.click(await screen.findByRole("button", { name: /Visita ao cliente/ }));
+    await userEvent.click(within(screen.getByRole("region", { name: "Compromisso selecionado" })).getByRole("button", { name: "Cancelar" }));
+    await waitFor(() => expect(patched(calls, key)).toEqual({ status: "cancelled" }));
   });
 
   it("is read-only for a colaborador", async () => {
-    open([reuniao], COLABORADOR);
-    await screen.findByText(reuniao.title);
+    open([base], COLABORADOR);
 
-    expect(screen.queryByRole("button", { name: "Confirmar" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Cancelar" })).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: /14:00 Reunião do projeto IE/ }));
+
+    const panel = screen.getByRole("region", { name: "Compromisso selecionado" });
+    expect(within(panel).queryByRole("button", { name: "Confirmar" })).not.toBeInTheDocument();
+    expect(within(panel).queryByRole("button", { name: "Cancelar" })).not.toBeInTheDocument();
   });
 
-  it("opens the related demand when the title is clicked", async () => {
-    open([reuniao]);
+  it("opens the case and links to the conversation", async () => {
+    open([base]);
+    await userEvent.click(await screen.findByRole("button", { name: /14:00 Reunião do projeto IE/ }));
+    const panel = screen.getByRole("region", { name: "Compromisso selecionado" });
 
-    await userEvent.click(await screen.findByRole("button", { name: reuniao.title }));
-
+    expect(within(panel).getByRole("link", { name: "Ver a conversa" })).toHaveAttribute("href", "/contatos/c1/conversa");
+    await userEvent.click(within(panel).getByRole("button", { name: "Abrir o caso" }));
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 
-  it("invites the first appointment when the agenda is empty", async () => {
-    open([]);
-
-    expect(await screen.findByText(/Nenhum compromisso à vista\. Quando/)).toBeInTheDocument();
-  });
-
   it("explains a failed change", async () => {
-    open([reuniao], SOCIO, { "PATCH /api/v1/appointments/a1": () => [500, { detail: "x" }] });
+    open([base], SOCIO, { "PATCH /api/v1/appointments/a1": () => [500, { detail: "x" }] });
+    await userEvent.click(await screen.findByRole("button", { name: /14:00 Reunião do projeto IE/ }));
 
-    await userEvent.click(await screen.findByRole("button", { name: "Confirmar" }));
+    await userEvent.click(within(screen.getByRole("region", { name: "Compromisso selecionado" })).getByRole("button", { name: "Confirmar" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Não foi possível salvar");
+  });
+});
+
+describe("agenda: month and list", () => {
+  it("shows the month with the appointment on its day and goes to that week on click", async () => {
+    open([base]);
+    await userEvent.click(await screen.findByRole("button", { name: "Mês" }));
+
+    expect(await screen.findByText("outubro de 2026")).toBeInTheDocument();
+    const cell = screen.getByRole("button", { name: /28 de outubro/ });
+    expect(within(cell).getByText(/Reunião do projeto IE/)).toBeInTheDocument();
+    await userEvent.click(cell);
+
+    expect(await screen.findByText("26 de outubro a 1 de novembro de 2026")).toBeInTheDocument();
+  });
+
+  it("lists the next appointments grouped by day", async () => {
+    open([base, allDay]);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Lista" }));
+
+    const day = await screen.findByRole("region", { name: "quarta-feira, 28 de outubro" });
+    expect(within(day).getByText("Reunião do projeto IE")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "quinta-feira, 29 de outubro" })).toBeInTheDocument();
+  });
+
+  it("explains a failure to load", async () => {
+    open([], SOCIO, { "GET /api/v1/appointments": () => [500, { detail: "x" }] });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Não foi possível carregar a agenda");
   });
 });

@@ -14,7 +14,7 @@ function open(health: unknown, me: Me = SOCIO) {
     "GET /api/v1/users": () => [200, []],
     "GET /api/v1/channels/health": () => [200, health],
   };
-  return renderApp(<AppRoutes />, { signedIn: true, handlers });
+  return renderApp(<AppRoutes />, { route: "/quadro", signedIn: true, handlers });
 }
 
 describe("channel alert", () => {

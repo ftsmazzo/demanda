@@ -6,6 +6,7 @@ import { renderApp } from "../../test/utils";
 
 function open(cards: ReturnType<typeof makeCard>[]) {
   return renderApp(<AppRoutes />, {
+    route: "/quadro",
     signedIn: true,
     handlers: {
       "GET /api/v1/me": () => [200, SOCIO],

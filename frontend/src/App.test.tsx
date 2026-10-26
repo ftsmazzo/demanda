@@ -49,13 +49,13 @@ describe("app shell", () => {
   it("sends a colaborador away from areas that are not theirs", async () => {
     renderApp(<AppRoutes />, { route: "/painel", signedIn: true, handlers: signedInAs(COLABORADOR) });
 
-    expect(await screen.findByRole("link", { name: "Quadro", current: "page" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Hoje", current: "page" })).toBeInTheDocument();
   });
 
-  it("falls back to the board for unknown addresses", async () => {
+  it("falls back to today for unknown addresses", async () => {
     renderApp(<AppRoutes />, { route: "/nao-existe", signedIn: true, handlers: signedInAs(SOCIO) });
 
-    expect(await screen.findByRole("link", { name: "Quadro", current: "page" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Hoje", current: "page" })).toBeInTheDocument();
   });
 
   it("signs out from the user menu", async () => {

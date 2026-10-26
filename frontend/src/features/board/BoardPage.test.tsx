@@ -25,7 +25,7 @@ function handlersFor(me: Me, board = makeBoard(cards())): Handlers {
 }
 
 async function openBoard(me: Me = SOCIO, handlers = handlersFor(me)) {
-  const view = renderApp(<AppRoutes />, { signedIn: true, handlers });
+  const view = renderApp(<AppRoutes />, { route: "/quadro", signedIn: true, handlers });
   await screen.findByRole("heading", { name: "Novas" });
   return view;
 }
@@ -143,7 +143,7 @@ describe("board", () => {
       ...handlersFor(SOCIO),
       "GET /api/v1/board": () => (fail ? ([500, { detail: "x" }] as [number, unknown]) : ([200, makeBoard(cards())] as [number, unknown])),
     };
-    renderApp(<AppRoutes />, { signedIn: true, handlers });
+    renderApp(<AppRoutes />, { route: "/quadro", signedIn: true, handlers });
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Não foi possível carregar o quadro.");
     fail = false;

@@ -1,32 +1,51 @@
-import type { CSSProperties } from "react";
+import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import type { Appointment, AppointmentStatus } from "../../api/types";
+import type { Appointment } from "../../api/types";
 import { useCurrentUser } from "../../components/AppShell";
 import { useAppointments, usePatchAppointment } from "../../hooks/queries";
-import { groupByDay, timeLabel } from "../../lib/agenda";
+import { addDays, dayKey, rangeLabel, type CalendarView } from "../../lib/calendar";
 import { saveErrorMessage } from "../../lib/errors";
-import { SECTOR_COLOR, SECTOR_LABEL } from "../../lib/sectors";
+import { EventPanel } from "./EventPanel";
+import { ListView } from "./ListView";
+import { MonthView } from "./MonthView";
+import { parseDate, visibleRange, voice } from "./range";
+import { WeekView } from "./WeekView";
 
-const STATE_LABEL: Record<AppointmentStatus, string> = {
-  proposed: "Proposto",
-  confirmed: "Confirmado",
-  cancelled: "Cancelado",
-};
-
-function voice(list: Appointment[]): string {
-  const proposed = list.filter((item) => item.status === "proposed").length;
-  if (proposed) {
-    return `${proposed} ${proposed === 1 ? "compromisso espera" : "compromissos esperam"} a sua confirmação.`;
-  }
-  return list.length ? "Tudo confirmado por aqui." : "Nenhum compromisso à vista.";
-}
+const VIEWS: { id: CalendarView; label: string }[] = [
+  { id: "week", label: "Semana" },
+  { id: "month", label: "Mês" },
+  { id: "list", label: "Lista" },
+];
 
 export function AgendaPage() {
   const me = useCurrentUser();
   const [params, setParams] = useSearchParams();
-  const list = useAppointments();
+  const asked = params.get("visao");
+  const view: CalendarView = VIEWS.find((v) => v.id === asked)?.id ?? "week";
+  const cursor = parseDate(params.get("data"));
+  const range = visibleRange(view, cursor);
+  const list = useAppointments({ since: range.since.toISOString(), until: range.until.toISOString() });
   const patch = usePatchAppointment();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const canEdit = me.role !== "colaborador";
+
+  function update(changes: Record<string, string | null>) {
+    const next = new URLSearchParams(params);
+    for (const [key, value] of Object.entries(changes)) {
+      if (value === null) next.delete(key);
+      else next.set(key, value);
+    }
+    setParams(next);
+  }
+  function step(direction: 1 | -1) {
+    const moved =
+      view === "month" ? new Date(cursor.getFullYear(), cursor.getMonth() + direction, 1) : addDays(cursor, 7 * direction);
+    update({ data: dayKey(moved) });
+  }
+  function changeView(next: CalendarView) {
+    setSelectedId(null);
+    update({ visao: next === "week" ? null : next });
+  }
 
   if (list.isPending) {
     return (
@@ -46,20 +65,43 @@ export function AgendaPage() {
     );
   }
 
-  function openDemand(item: Appointment) {
-    const next = new URLSearchParams(params);
-    next.set("demanda", item.demand_id);
-    setParams(next);
-  }
-
-  const groups = groupByDay(list.data);
+  const items = list.data.filter((item) => item.status !== "cancelled");
+  const selected = items.find((item) => item.id === selectedId) ?? null;
+  const panelOpen = view !== "month" && selected !== null;
+  const pick = (item: Appointment) => setSelectedId(item.id);
+  const unit = view === "month" ? "Mês" : "Semana";
 
   return (
     <>
       <div className="view-head">
         <div>
           <h1 className="view-title">Agenda</h1>
-          <p className="voice">{voice(list.data)}</p>
+          <p className="voice">{voice(items)}</p>
+        </div>
+      </div>
+      <div className="cal-bar">
+        <div className="cal-nav">
+          {view === "list" ? null : (
+            <>
+              <button type="button" className="btn" aria-label={unit + " anterior"} onClick={() => step(-1)}>
+                ‹
+              </button>
+              <button type="button" className="btn" aria-label={unit + " seguinte"} onClick={() => step(1)}>
+                ›
+              </button>
+              <button type="button" className="btn" onClick={() => update({ data: null })}>
+                Hoje
+              </button>
+              <h2 className="cal-range">{rangeLabel(view, cursor)}</h2>
+            </>
+          )}
+        </div>
+        <div className="seg" role="group" aria-label="Visão">
+          {VIEWS.map((v) => (
+            <button key={v.id} type="button" className="seg-btn" aria-pressed={v.id === view} onClick={() => changeView(v.id)}>
+              {v.label}
+            </button>
+          ))}
         </div>
       </div>
       {patch.isError ? (
@@ -67,58 +109,37 @@ export function AgendaPage() {
           {saveErrorMessage(patch.error)}
         </p>
       ) : null}
-      {groups.length === 0 ? (
-        <p className="hint">
-          Nenhum compromisso à vista. Quando alguém marcar algo pelo WhatsApp, aparece aqui para você confirmar.
-        </p>
-      ) : (
-        groups.map((group) => (
-          <section key={group.key} className="agenda-day" aria-label={group.label}>
-            <h2 className="section-title">{group.label}</h2>
-            <ul className="agenda-list">
-              {group.items.map((item) => (
-                <li key={item.id} className="agenda-row" data-status={item.status}>
-                  <span className="agenda-time num">{timeLabel(item)}</span>
-                  <div className="agenda-main">
-                    <button type="button" className="agenda-title" onClick={() => openDemand(item)}>
-                      {item.title}
-                    </button>
-                    <span className="agenda-meta">
-                      {item.contact ? <span>{item.contact.name ?? "Contato sem nome"}</span> : null}
-                      <span className="sector" style={{ "--dot": SECTOR_COLOR[item.sector] } as CSSProperties}>
-                        {SECTOR_LABEL[item.sector]}
-                      </span>
-                    </span>
-                  </div>
-                  <span className="agenda-state">{STATE_LABEL[item.status]}</span>
-                  {canEdit ? (
-                    <span className="agenda-actions">
-                      {item.status === "proposed" ? (
-                        <button
-                          type="button"
-                          className="btn btn-primary"
-                          disabled={patch.isPending}
-                          onClick={() => patch.mutate({ id: item.id, status: "confirmed" })}
-                        >
-                          Confirmar
-                        </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        className="btn"
-                        disabled={patch.isPending}
-                        onClick={() => patch.mutate({ id: item.id, status: "cancelled" })}
-                      >
-                        Cancelar
-                      </button>
-                    </span>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))
-      )}
+      <div className="cal-layout" data-panel={panelOpen ? "open" : "closed"}>
+        <div className="cal-main">
+          {view === "week" ? (
+            <>
+              {items.length === 0 ? <p className="hint">Semana sem compromissos.</p> : null}
+              <WeekView cursor={cursor} items={items} selectedId={selectedId} onSelect={pick} />
+            </>
+          ) : null}
+          {view === "month" ? (
+            <MonthView
+              cursor={cursor}
+              items={items}
+              onPickDay={(date) => {
+                setSelectedId(null);
+                update({ visao: null, data: dayKey(date) });
+              }}
+            />
+          ) : null}
+          {view === "list" ? <ListView items={items} selectedId={selectedId} onSelect={pick} /> : null}
+        </div>
+        {panelOpen && selected ? (
+          <EventPanel
+            item={selected}
+            canEdit={canEdit}
+            busy={patch.isPending}
+            onStatus={(status) => patch.mutate({ id: selected.id, status })}
+            onOpenCase={() => update({ demanda: selected.demand_id })}
+            onClose={() => setSelectedId(null)}
+          />
+        ) : null}
+      </div>
     </>
   );
 }
