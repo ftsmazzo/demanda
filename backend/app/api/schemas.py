@@ -6,7 +6,7 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StringConstrai
 
 Status = Literal["novo", "em_andamento", "aguardando", "concluido"]
 Sector = Literal["triagem", "fiscal", "contabil", "dp", "societario", "financeiro", "rh-interno"]
-Kind = Literal["tarefa", "compromisso", "duvida", "documento", "cobranca", "reclamacao"]
+Kind = Literal["tarefa", "compromisso", "duvida", "documento", "cobranca", "reclamacao", "nota"]
 Urgency = Literal["normal", "alta", "critica"]
 ContactKind = Literal["cliente", "fornecedor", "colaborador", "desconhecido"]
 Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]

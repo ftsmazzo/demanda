@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import psycopg
 
-from app.core.schedule import extract_when
+from app.core.schedule import When, extract_when
 from app.db import Database
 
 DEFAULT_TIMEZONE = "America/Sao_Paulo"
@@ -18,6 +18,26 @@ def _tenant_zone(conn: psycopg.Connection, tenant_id: UUID) -> ZoneInfo:
         return ZoneInfo(row[0] if row else DEFAULT_TIMEZONE)
     except ZoneInfoNotFoundError:
         return ZoneInfo(DEFAULT_TIMEZONE)
+
+
+def insert_appointment(
+    conn: psycopg.Connection,
+    *,
+    tenant_id: UUID,
+    demand_id: UUID,
+    contact_id: UUID | None,
+    message_id: UUID,
+    title: str,
+    when: When,
+) -> bool:
+    """Grava o compromisso proposto. Uma mensagem gera no maximo um (idempotente)."""
+    row = conn.execute(
+        "INSERT INTO appointments (tenant_id, demand_id, contact_id, source_message_id, title, "
+        "starts_at, all_day) VALUES (%s, %s, %s, %s, %s, %s, %s) "
+        "ON CONFLICT (source_message_id) DO NOTHING RETURNING id",
+        (tenant_id, demand_id, contact_id, message_id, title, when.start, when.all_day),
+    ).fetchone()
+    return row is not None
 
 
 def propose_appointment(
@@ -36,13 +56,15 @@ def propose_appointment(
     when = extract_when(text or "", sent_at.astimezone(zone))
     if when is None:
         return False
-    row = conn.execute(
-        "INSERT INTO appointments (tenant_id, demand_id, contact_id, source_message_id, title, "
-        "starts_at, all_day) VALUES (%s, %s, %s, %s, %s, %s, %s) "
-        "ON CONFLICT (source_message_id) DO NOTHING RETURNING id",
-        (tenant_id, demand_id, contact_id, message_id, title, when.start, when.all_day),
-    ).fetchone()
-    return row is not None
+    return insert_appointment(
+        conn,
+        tenant_id=tenant_id,
+        demand_id=demand_id,
+        contact_id=contact_id,
+        message_id=message_id,
+        title=title,
+        when=when,
+    )
 
 
 _BACKFILL = """

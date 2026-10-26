@@ -131,3 +131,20 @@ def test_the_agent_worker_runs_every_tenant_and_survives_one_failing(
     assert all(s is sender and url == "https://x.example" for _, s, url in seen)
     assert summary["tenant_errors"] >= 1
     assert summary["sent"] >= 1
+
+
+def test_a_cycle_with_the_case_ai_writes_the_title_and_summary(database, admin_conn, channel):
+    from tests.cases_helpers import FakeCaseLLM, decision, demands_of, phone
+
+    add_message(
+        admin_conn, channel, "WC1", "Preciso da guia xyzciclocaso", phone=phone(), minutes=800000
+    )
+    case_llm = FakeCaseLLM(
+        decision(title="Guia pedida xyzciclocaso", kind="tarefa", sector="fiscal")
+    )
+
+    summary = run_cycle(database, llm=None, case_llm=case_llm)
+
+    ((_, title, *_),) = demands_of(admin_conn, channel.tenant_id, "xyzciclocaso")
+    assert title == "Guia pedida xyzciclocaso"
+    assert summary["created"] >= 1

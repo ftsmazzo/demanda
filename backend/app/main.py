@@ -19,6 +19,8 @@ from app.api.demand_writes import router as demand_writes_router
 from app.api.demands import router as demands_router
 from app.api.deps import AuthSettings
 from app.api.people import router as people_router
+from app.cases.llm import CaseLLM, build_case_llm
+from app.cases.service import DEFAULT_DAILY_CAP
 from app.channel_health import EvolutionLike
 from app.classification.factory import build_classifier
 from app.classification.llm import LLMClassifier
@@ -58,6 +60,8 @@ def create_app(
     agent_app_url: str = "",
     agent_interval_seconds: float = 60,
     agent_webhook_secret: str | None = None,
+    case_llm: CaseLLM | None = None,
+    case_daily_cap: int = DEFAULT_DAILY_CAP,
 ) -> FastAPI:
     """database_url: conexao de runtime. admin_url: dono do schema, so para migrations."""
     db = Database(database_url, app_role=app_role, max_size=pool_max) if database_url else None
@@ -75,7 +79,13 @@ def create_app(
         workers: list[BackgroundWorker] = []
         if db is not None and worker_interval_seconds:
             workers.append(
-                BackgroundWorker(db, classifier, interval_seconds=worker_interval_seconds)
+                BackgroundWorker(
+                    db,
+                    classifier,
+                    interval_seconds=worker_interval_seconds,
+                    case_llm=case_llm,
+                    daily_cap=case_daily_cap,
+                )
             )
         if db is not None and evolution is not None:
             workers.append(HealthMonitor(db, evolution, interval_seconds=health_interval_seconds))
@@ -156,6 +166,9 @@ _worker_interval = float(os.environ.get("WORKER_INTERVAL_SECONDS", "0"))
 _classifier, _classifier_note = build_classifier(os.environ) if _worker_interval else (None, "")
 if _worker_interval:
     logger.warning("worker ligado a cada %ss: %s", _worker_interval, _classifier_note)
+_case_llm, _case_note = build_case_llm(os.environ) if _worker_interval else (None, "")
+if _worker_interval:
+    logger.warning("%s", _case_note)
 app = create_app(
     os.environ.get("APP_DATABASE_URL") or _admin_url,
     admin_url=_admin_url,
@@ -173,5 +186,7 @@ app = create_app(
     agent_sender=_agent_sender,
     agent_app_url=os.environ.get("AGENT_APP_URL", ""),
     agent_webhook_secret=os.environ.get("AGENT_WEBHOOK_SECRET") or None,
+    case_llm=_case_llm,
+    case_daily_cap=int(os.environ.get("CASE_DAILY_CAP", str(DEFAULT_DAILY_CAP))),
     health_interval_seconds=float(os.environ.get("HEALTH_INTERVAL_SECONDS", "60")),
 )
