@@ -120,7 +120,36 @@ def _mark_priority(conn, tenant_id, p: dict[str, Any], app_url: str) -> str:
     return f"Pronto: {done[0]} agora é cliente {state}."
 
 
+def _reschedule(conn, tenant_id, p: dict[str, Any], app_url: str) -> str:
+    found = conn.execute(
+        "SELECT id, demand_id, title, starts_at, all_day FROM appointments "
+        "WHERE id = %s AND status <> 'cancelled' FOR UPDATE",
+        (UUID(p["appointment_id"]),),
+    ).fetchone()
+    if found is None:
+        return "Não consegui: o compromisso não está mais disponível."
+    appointment_id, demand_id, title, starts_at, all_day = found
+    starts = datetime.fromisoformat(p["starts_at"])
+    conn.execute(
+        "UPDATE appointments SET starts_at = %s, all_day = %s, updated_at = now() WHERE id = %s",
+        (starts, p["all_day"], appointment_id),
+    )
+    conn.execute(
+        "UPDATE demands SET last_activity_at = now(), updated_at = now() WHERE id = %s",
+        (demand_id,),
+    )
+    data = {
+        "appointment_id": str(appointment_id),
+        "before": {"starts_at": starts_at.isoformat(), "all_day": all_day},
+        "after": {"starts_at": starts.isoformat(), "all_day": p["all_day"]},
+        "via": "agente",
+    }
+    _event(conn, tenant_id, demand_id, "appointment_updated", data)
+    return f"Pronto: {title} remarcado para {p['when_label']}."
+
+
 _EXECUTORS = {
+    "reschedule": _reschedule,
     "create_task": _create_task,
     "assign": _assign,
     "set_status": _set_status,

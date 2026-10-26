@@ -1,6 +1,6 @@
 # Agente em linguagem natural
 
-O socio escreve para a Secretaria como falaria com uma pessoa ("o que a Ana tem pendente?", "cria uma tarefa para o Bruno: conferir a folha do Mercado Bom Preco", "marca a Padaria como prioritaria"). Os comandos curtos (`1`, `2`, `parado`, `agenda`, `ajuda`) continuam valendo e nao gastam IA.
+O socio escreve para a Secretaria como falaria com uma pessoa ("o que a Ana tem pendente?", "cria uma tarefa para o Bruno: conferir a folha do Mercado Bom Preco", "marca a Padaria como prioritaria", "remarca a reuniao do projeto pra quinta as 15h"). Os comandos curtos (`1`, `2`, `parado`, `agenda`, `ajuda`) continuam valendo e nao gastam IA.
 
 ## Principios
 
@@ -12,4 +12,4 @@ O socio escreve para a Secretaria como falaria com uma pessoa ("o que a Ana tem 
 
 ## Intencoes
 
-`query_demands` (filtros: situacao, setor, pessoa, cliente, so prioritarios, paradas), `query_agenda` (hoje, amanha, semana), `summary`, `create_task`, `assign`, `set_status`, `mark_priority`, `unknown`.
+`query_demands` (filtros: situacao, setor, pessoa, cliente, so prioritarios, paradas), `query_agenda` (hoje, amanha, semana), `summary`, `create_task`, `assign`, `set_status`, `mark_priority`, `reschedule` (muda o dia ou a hora de um compromisso futuro, achado pelo titulo, caso ou cliente; mostra o antes e o depois e so o `1` aplica; o historico do caso guarda a remarcacao), `unknown`.

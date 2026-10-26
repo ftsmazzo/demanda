@@ -56,6 +56,15 @@ def test_required_fields_per_intent():
         parse_intent(good(intent="mark_priority", contact_name="Padaria", priority_value=None))
 
 
+def test_a_reschedule_needs_the_appointment_and_the_new_time():
+    ok = parse_intent(good(intent="reschedule", case_text="reuniao IE", due_phrase="quinta 15h"))
+    assert (ok.case_text, ok.due_phrase) == ("reuniao IE", "quinta 15h")
+    with pytest.raises(ValueError):
+        parse_intent(good(intent="reschedule", case_text="reuniao IE", due_phrase=None))
+    with pytest.raises(ValueError):
+        parse_intent(good(intent="reschedule", case_text=None, due_phrase="quinta 15h"))
+
+
 def test_valid_assign_status_and_priority_requests():
     assign = parse_intent(good(intent="assign", case_text="folha de outubro", assignee_name="Ana"))
     status = parse_intent(good(intent="set_status", case_text="folha", status="concluido"))

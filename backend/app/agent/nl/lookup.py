@@ -2,6 +2,7 @@
 
 import re
 import unicodedata
+from datetime import datetime
 from uuid import UUID
 
 import psycopg
@@ -61,6 +62,23 @@ def find_contacts(conn: psycopg.Connection, name: str, limit: int = 6) -> list[t
         f"SELECT id, COALESCE(name, phone) FROM contacts WHERE name IS NOT NULL "
         f"AND {folded('name')} LIKE ALL(%s) ORDER BY priority DESC, updated_at DESC, id LIMIT %s",
         (_like_patterns(wanted), limit),
+    ).fetchall()
+
+
+def find_appointments(
+    conn: psycopg.Connection, text: str, now: datetime, limit: int = 4
+) -> list[tuple[UUID, str]]:
+    """Compromissos de hoje em diante (nao cancelados) cujo titulo, caso ou cliente cita o texto."""
+    wanted = tokens(text)
+    if not wanted:
+        return []
+    haystack = folded("(a.title || ' ' || COALESCE(d.title, '') || ' ' || COALESCE(c.name, ''))")
+    return conn.execute(
+        "SELECT a.id, a.title FROM appointments a JOIN demands d ON d.id = a.demand_id "
+        "LEFT JOIN contacts c ON c.id = d.contact_id "
+        f"WHERE {haystack} LIKE ALL(%s) AND a.status <> 'cancelled' AND a.starts_at >= %s "
+        "ORDER BY a.starts_at, a.id LIMIT %s",
+        (_like_patterns(wanted), now, limit),
     ).fetchall()
 
 

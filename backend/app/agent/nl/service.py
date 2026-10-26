@@ -12,7 +12,7 @@ from app.agent.messages import _day, unknown_text
 from app.agent.nl import actions, queries
 from app.agent.nl.contract import Intent
 from app.agent.nl.llm import IntentContext, IntentLLM
-from app.agent.nl.lookup import find_contacts, find_demands, find_users
+from app.agent.nl.lookup import find_appointments, find_contacts, find_demands, find_users
 from app.agent.runner import SECTOR_LABEL
 from app.core.appointments import _tenant_zone
 from app.core.schedule import extract_when
@@ -156,6 +156,35 @@ def _propose_priority(conn, tenant_id, recipient_id, intent: Intent, now) -> str
     return _ask(summary)
 
 
+def _when_label(start: datetime, all_day: bool) -> str:
+    return f"{_day(start.date())}" + ("" if all_day else f" às {start:%H:%M}")
+
+
+def _propose_reschedule(conn, tenant_id, recipient_id, intent: Intent, zone, now) -> str:
+    found = find_appointments(conn, intent.case_text or "", now)
+    if not found:
+        return f"Não achei nenhum compromisso marcado com: {intent.case_text}."
+    if len(found) > 1:
+        return _options("compromisso", found)
+    when = extract_when(intent.due_phrase or "", now.astimezone(zone))
+    if when is None:
+        return "Não entendi o dia e a hora novos. Repita o pedido, por exemplo: quinta às 15h."
+    appointment_id, title = found[0]
+    old = conn.execute(
+        "SELECT starts_at, all_day FROM appointments WHERE id = %s", (appointment_id,)
+    ).fetchone()
+    label = _when_label(when.start.astimezone(zone), when.all_day)
+    summary = f"remarcar *{title}* de {_when_label(old[0].astimezone(zone), old[1])} para {label}"
+    payload = {
+        "appointment_id": str(appointment_id),
+        "starts_at": when.start.isoformat(),
+        "all_day": when.all_day,
+        "when_label": label,
+    }
+    actions.propose(conn, tenant_id, recipient_id, "reschedule", payload, summary, now)
+    return _ask(summary)
+
+
 def _dispatch(conn, tenant_id, recipient_id, intent: Intent, zone, now, app_url) -> str:
     local_now = now.astimezone(zone)
     if intent.intent == "query_demands":
@@ -172,6 +201,8 @@ def _dispatch(conn, tenant_id, recipient_id, intent: Intent, zone, now, app_url)
         return _propose_status(conn, tenant_id, recipient_id, intent, now)
     if intent.intent == "mark_priority":
         return _propose_priority(conn, tenant_id, recipient_id, intent, now)
+    if intent.intent == "reschedule":
+        return _propose_reschedule(conn, tenant_id, recipient_id, intent, zone, now)
     return unknown_text()
 
 
