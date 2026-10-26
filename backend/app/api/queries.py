@@ -5,7 +5,17 @@ from uuid import UUID
 
 import psycopg
 
-from app.api.schemas import Card, ContactRef, Detail, MessageOut, PersonRef, Progress, SubtaskOut
+from app.api.schemas import (
+    AppointmentBrief,
+    Card,
+    ContactRef,
+    Detail,
+    EventOut,
+    MessageOut,
+    PersonRef,
+    Progress,
+    SubtaskOut,
+)
 from app.core.access import visibility_clause
 from app.core.users import CurrentUser
 
@@ -15,7 +25,8 @@ CARD_SELECT = """
            d.assignee_id, u.name, d.contact_id, c.name, c.phone, c.kind,
            COALESCE(st.total, 0), COALESCE(st.done, 0), COALESCE(mc.total, 0),
            CASE WHEN d.status = 'concluido' THEN 0
-                ELSE FLOOR(EXTRACT(EPOCH FROM (now() - d.last_activity_at)) / 3600)::int END
+                ELSE FLOOR(EXTRACT(EPOCH FROM (now() - d.last_activity_at)) / 3600)::int END,
+           d.summary, d.next_step, d.needs_review, d.review_reason
     FROM demands d
     LEFT JOIN users u ON u.id = d.assignee_id
     LEFT JOIN contacts c ON c.id = d.contact_id
@@ -43,6 +54,16 @@ _MESSAGES = """
 
 _SUBTASKS = "SELECT id, title, done FROM subtasks WHERE demand_id = %s ORDER BY created_at, id"
 
+_EVENTS = """
+    SELECT id, actor, kind, data, created_at FROM case_events
+    WHERE demand_id = %s ORDER BY created_at, id LIMIT 100
+"""
+
+_APPOINTMENTS = """
+    SELECT id, title, starts_at, all_day, status FROM appointments
+    WHERE demand_id = %s ORDER BY starts_at, id LIMIT 50
+"""
+
 
 def row_to_card(row: tuple[Any, ...]) -> Card:
     (
@@ -67,6 +88,10 @@ def row_to_card(row: tuple[Any, ...]) -> Card:
         done,
         messages,
         idle,
+        summary,
+        next_step,
+        needs_review,
+        review_reason,
     ) = row
     percent = round(100 * done / total) if total else 0
     return Card(
@@ -88,6 +113,10 @@ def row_to_card(row: tuple[Any, ...]) -> Card:
         last_activity_at=activity,
         closed_at=closed,
         idle_hours=idle,
+        summary=summary,
+        next_step=next_step,
+        needs_review=needs_review,
+        review_reason=review_reason,
     )
 
 
@@ -128,4 +157,18 @@ def fetch_detail(conn: psycopg.Connection, user: CurrentUser, demand_id: UUID) -
         SubtaskOut(id=s[0], title=s[1], done=s[2])
         for s in conn.execute(_SUBTASKS, (demand_id,)).fetchall()
     ]
-    return Detail(**card.model_dump(), messages=messages, subtasks=subtasks)
+    events = [
+        EventOut(id=e[0], actor=e[1], kind=e[2], data=e[3], created_at=e[4])
+        for e in conn.execute(_EVENTS, (demand_id,)).fetchall()
+    ]
+    appointments = [
+        AppointmentBrief(id=a[0], title=a[1], starts_at=a[2], all_day=a[3], status=a[4])
+        for a in conn.execute(_APPOINTMENTS, (demand_id,)).fetchall()
+    ]
+    return Detail(
+        **card.model_dump(),
+        messages=messages,
+        subtasks=subtasks,
+        events=events,
+        appointments=appointments,
+    )

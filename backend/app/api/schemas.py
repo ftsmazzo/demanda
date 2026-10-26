@@ -48,6 +48,10 @@ class Card(BaseModel):
     last_activity_at: datetime
     closed_at: datetime | None
     idle_hours: int
+    summary: str | None = None
+    next_step: str | None = None
+    needs_review: bool = False
+    review_reason: str | None = None
 
 
 class MessageOut(BaseModel):
@@ -64,9 +68,48 @@ class SubtaskOut(BaseModel):
     done: bool
 
 
+class EventOut(BaseModel):
+    id: UUID
+    actor: str
+    kind: str
+    data: dict
+    created_at: datetime
+
+
+class AppointmentBrief(BaseModel):
+    id: UUID
+    title: str
+    starts_at: datetime
+    all_day: bool
+    status: str
+
+
 class Detail(Card):
     messages: list[MessageOut]
     subtasks: list[SubtaskOut]
+    events: list[EventOut] = []
+    appointments: list[AppointmentBrief] = []
+
+
+class ConversationMessage(BaseModel):
+    id: UUID
+    direction: str
+    text: str | None
+    type: str
+    sent_at: datetime
+    demand_id: UUID | None
+
+
+class Conversation(BaseModel):
+    contact: ContactRef
+    cases: list[Card]
+    messages: list[ConversationMessage]
+
+
+class MergeBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    into: UUID
 
 
 class Column(BaseModel):
@@ -108,7 +151,13 @@ class _AtLeastOneField(BaseModel):
 
 
 class DemandPatch(_AtLeastOneField):
-    not_nullable: ClassVar[tuple[str, ...]] = ("title", "status", "urgency", "sector")
+    not_nullable: ClassVar[tuple[str, ...]] = (
+        "title",
+        "status",
+        "urgency",
+        "sector",
+        "needs_review",
+    )
 
     title: Title | None = None
     status: Status | None = None
@@ -116,6 +165,7 @@ class DemandPatch(_AtLeastOneField):
     sector: Sector | None = None
     due_date: date | None = None
     assignee_id: UUID | None = None
+    needs_review: bool | None = None
 
 
 class SubtaskCreate(BaseModel):

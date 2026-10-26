@@ -6,8 +6,16 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.api.deps import CurrentUserDep, get_db
-from app.api.schemas import ContactKind, ContactPatch, ContactRef, UserOut
-from app.core.access import HR_SECTOR, can_access_hr
+from app.api.queries import CARD_SELECT, row_to_card
+from app.api.schemas import (
+    ContactKind,
+    ContactPatch,
+    ContactRef,
+    Conversation,
+    ConversationMessage,
+    UserOut,
+)
+from app.core.access import HR_SECTOR, can_access_hr, visibility_clause
 from app.core.users import CurrentUser
 from app.db import Database
 
@@ -107,3 +115,46 @@ def list_users(user: CurrentUserDep, db: DbDep) -> list[UserOut]:
         )
         for r in rows
     ]
+
+
+_CONVERSATION = """
+    SELECT m.id, m.direction, m.text, m.message_type, m.provider_timestamp, dm.demand_id
+    FROM messages m
+    LEFT JOIN demand_messages dm ON dm.message_id = m.id
+    LEFT JOIN demands d ON d.id = dm.demand_id
+    WHERE m.contact_id = %s AND (dm.demand_id IS NULL OR ({clause}))
+    ORDER BY m.provider_timestamp DESC, m.id DESC
+    LIMIT 200
+"""
+
+
+@router.get("/contacts/{contact_id}/conversation")
+def contact_conversation(contact_id: UUID, user: CurrentUserDep, db: DbDep) -> Conversation:
+    """A conversa inteira com um contato: as duas pontas e os casos que dela saíram."""
+    _require_manager(user)
+    clause, params = visibility_clause(user)
+    with db.tenant_transaction(user.tenant_id) as conn:
+        row = conn.execute(
+            "SELECT id, name, phone, kind FROM contacts WHERE id = %s", (contact_id,)
+        ).fetchone()
+        # conversa com funcionario do escritorio e assunto de RH interno
+        if row is None or (row[3] == "colaborador" and not can_access_hr(user)):
+            raise HTTPException(status_code=404, detail="contato nao encontrado")
+        messages = conn.execute(
+            _CONVERSATION.format(clause=clause), [contact_id, *params]
+        ).fetchall()
+        cases = conn.execute(
+            f"{CARD_SELECT} WHERE d.contact_id = %s AND ({clause}) "
+            "ORDER BY d.last_activity_at DESC, d.id LIMIT 30",
+            [contact_id, *params],
+        ).fetchall()
+    return Conversation(
+        contact=ContactRef(id=row[0], name=row[1], phone=row[2], kind=row[3]),
+        cases=[row_to_card(c) for c in cases],
+        messages=[
+            ConversationMessage(
+                id=m[0], direction=m[1], text=m[2], type=m[3], sent_at=m[4], demand_id=m[5]
+            )
+            for m in reversed(messages)
+        ],
+    )

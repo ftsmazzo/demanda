@@ -51,3 +51,27 @@ ALTER TABLE ai_usage FORCE ROW LEVEL SECURITY;
 CREATE POLICY ai_usage_isolation ON ai_usage
     USING (tenant_id = (SELECT app_tenant_id()))
     WITH CHECK (tenant_id = (SELECT app_tenant_id()));
+
+-- Juntar dois casos move mensagens e historico para o caso de destino e apaga o de origem.
+GRANT UPDATE ON demand_messages, case_events TO demanda_app;
+
+-- O papel do app continua sem poder apagar demandas. Esta funcao so apaga um caso que ja
+-- ficou vazio (sem mensagens, etapas, compromissos nem historico) e so do tenant atual.
+CREATE FUNCTION delete_empty_demand(p_demand uuid) RETURNS boolean
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path = public, pg_temp
+    AS $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM demand_messages WHERE demand_id = p_demand)
+       OR EXISTS (SELECT 1 FROM subtasks WHERE demand_id = p_demand)
+       OR EXISTS (SELECT 1 FROM appointments WHERE demand_id = p_demand)
+       OR EXISTS (SELECT 1 FROM case_events WHERE demand_id = p_demand) THEN
+        RETURN false;
+    END IF;
+    DELETE FROM demands WHERE id = p_demand AND tenant_id = (SELECT app_tenant_id());
+    RETURN FOUND;
+END
+$$;
+
+REVOKE ALL ON FUNCTION delete_empty_demand(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION delete_empty_demand(uuid) TO demanda_app;

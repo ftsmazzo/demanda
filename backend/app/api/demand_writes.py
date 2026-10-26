@@ -5,6 +5,7 @@ from uuid import UUID
 
 import psycopg
 from fastapi import APIRouter, Depends, HTTPException
+from psycopg.types.json import Jsonb
 
 from app.api.deps import CurrentUserDep, get_db
 from app.api.queries import fetch_detail
@@ -12,6 +13,7 @@ from app.api.schemas import (
     DemandCreate,
     DemandPatch,
     Detail,
+    MergeBody,
     SubtaskCreate,
     SubtaskOut,
     SubtaskPatch,
@@ -121,6 +123,11 @@ def patch_demand(demand_id: UUID, body: DemandPatch, user: CurrentUserDep, db: D
         if "assignee_id" in fields:
             sets.append("assignee_id = %s")
             values.append(body.assignee_id)
+        if "needs_review" in fields and body.needs_review is not None:
+            sets.append("needs_review = %s")
+            values.append(body.needs_review)
+            if not body.needs_review:
+                sets.append("review_reason = NULL")
         if "status" in fields and body.status:
             sets.append("status = %s")
             values.append(body.status)
@@ -195,3 +202,51 @@ def patch_subtask(
         ).fetchone()
         _touch(conn, found[0])
     return SubtaskOut(id=row[0], title=row[1], done=row[2])
+
+
+_MERGE_MOVES = (
+    "UPDATE demand_messages SET demand_id = %(into)s WHERE demand_id = %(src)s",
+    "UPDATE subtasks SET demand_id = %(into)s WHERE demand_id = %(src)s",
+    "UPDATE appointments SET demand_id = %(into)s WHERE demand_id = %(src)s",
+    "UPDATE case_events SET demand_id = %(into)s WHERE demand_id = %(src)s",
+)
+
+
+@router.post("/demands/{demand_id}/merge")
+def merge_demand(demand_id: UUID, body: MergeBody, user: CurrentUserDep, db: DbDep) -> Detail:
+    """Junta um caso em outro do mesmo contato: o de origem deixa de existir, nada se perde."""
+    if user.role == "colaborador":
+        raise HTTPException(status_code=403, detail="sem permissao")
+    if body.into == demand_id:
+        raise HTTPException(status_code=422, detail="escolha outro caso para juntar")
+    clause, params = visibility_clause(user)
+    with db.tenant_transaction(user.tenant_id) as conn:
+        rows = conn.execute(
+            f"SELECT d.id, d.contact_id, d.title FROM demands d WHERE d.id = ANY(%s) AND {clause} "
+            "FOR UPDATE OF d",
+            [[demand_id, body.into], *params],
+        ).fetchall()
+        found = {row[0]: row for row in rows}
+        if demand_id not in found or body.into not in found:
+            raise _not_found()
+        if found[demand_id][1] is None or found[demand_id][1] != found[body.into][1]:
+            raise HTTPException(
+                status_code=422, detail="so e possivel juntar casos do mesmo contato"
+            )
+        for statement in _MERGE_MOVES:
+            conn.execute(statement, {"into": body.into, "src": demand_id})
+        conn.execute(
+            "INSERT INTO case_events (tenant_id, demand_id, actor, kind, data) "
+            "VALUES (%s, %s, 'user', 'merged', %s)",
+            (user.tenant_id, body.into, Jsonb({"from_title": found[demand_id][2]})),
+        )
+        conn.execute(
+            "UPDATE demands SET last_activity_at = GREATEST(last_activity_at, "
+            "(SELECT last_activity_at FROM demands WHERE id = %s)), updated_at = now() "
+            "WHERE id = %s",
+            (demand_id, body.into),
+        )
+        if not conn.execute("SELECT delete_empty_demand(%s)", (demand_id,)).fetchone()[0]:
+            raise HTTPException(status_code=409, detail="nao foi possivel juntar os casos")
+        detail = fetch_detail(conn, user, body.into)
+    return detail
