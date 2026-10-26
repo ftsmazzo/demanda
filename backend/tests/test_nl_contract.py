@@ -96,3 +96,47 @@ def test_texts_are_trimmed_and_cut_and_unknown_needs_nothing():
     for bad in (None, [], "texto"):
         with pytest.raises(ValueError):
             parse_intent(bad)
+
+
+def _walk(node):
+    if isinstance(node, dict):
+        yield node
+        for value in node.values():
+            yield from _walk(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from _walk(value)
+
+
+def test_the_provider_schema_uses_plain_enums_and_no_nullable_booleans():
+    from app.agent.nl.contract import OUTPUT_SCHEMA
+
+    for node in _walk(OUTPUT_SCHEMA):
+        if "enum" in node:
+            assert None not in node["enum"], node
+            assert node.get("type") == "string", node
+        assert node.get("type") != ["boolean", "null"], node
+
+
+def test_the_none_marker_means_no_value():
+    intent = parse_intent(
+        good(
+            intent="query_demands",
+            sector="none",
+            urgency="none",
+            status="none",
+            status_filter="none",
+            range="none",
+            priority_value="none",
+        )
+    )
+
+    assert (intent.sector, intent.urgency, intent.status) == (None, None, None)
+    assert (intent.status_filter, intent.range, intent.priority_value) == (None, None, None)
+
+
+def test_yes_and_no_work_as_the_priority_value():
+    star = parse_intent(good(intent="mark_priority", contact_name="Padaria", priority_value="yes"))
+    off = parse_intent(good(intent="mark_priority", contact_name="Padaria", priority_value="no"))
+
+    assert star.priority_value is True and off.priority_value is False

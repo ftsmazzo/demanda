@@ -24,6 +24,8 @@ MAX_NAME = 80
 MAX_CASE_TEXT = 120
 MAX_PHRASE = 80
 
+# Os provedores recusam enum com null e booleano anulavel: "none" faz o papel de vazio.
+NONE = "none"
 _NULLABLE = {"type": ["string", "null"]}
 OUTPUT_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -31,17 +33,17 @@ OUTPUT_SCHEMA: dict[str, Any] = {
         "intent": {"type": "string", "enum": list(INTENTS)},
         "confidence": {"type": "number"},
         "title": _NULLABLE,
-        "sector": {"type": ["string", "null"], "enum": [*SECTORS, None]},
+        "sector": {"type": "string", "enum": [*SECTORS, NONE]},
         "assignee_name": _NULLABLE,
         "contact_name": _NULLABLE,
-        "urgency": {"type": ["string", "null"], "enum": [*URGENCIES, None]},
+        "urgency": {"type": "string", "enum": [*URGENCIES, NONE]},
         "due_phrase": _NULLABLE,
         "case_text": _NULLABLE,
-        "status": {"type": ["string", "null"], "enum": [*STATUSES, None]},
-        "status_filter": {"type": ["string", "null"], "enum": [*STATUS_FILTERS, None]},
-        "range": {"type": ["string", "null"], "enum": [*RANGES, None]},
+        "status": {"type": "string", "enum": [*STATUSES, NONE]},
+        "status_filter": {"type": "string", "enum": [*STATUS_FILTERS, NONE]},
+        "range": {"type": "string", "enum": [*RANGES, NONE]},
         "priority_only": {"type": "boolean"},
-        "priority_value": {"type": ["boolean", "null"]},
+        "priority_value": {"type": "string", "enum": ["yes", "no", NONE]},
     },
     "required": [
         "intent",
@@ -92,7 +94,7 @@ def _text(data: dict[str, Any], key: str, limit: int) -> str | None:
 
 def _choice(data: dict[str, Any], key: str, allowed: tuple[str, ...]) -> str | None:
     value = data.get(key)
-    if value is None:
+    if value is None or value == NONE:
         return None
     if value not in allowed:
         raise ValueError(f"{key} invalido: {value!r}")
@@ -101,8 +103,10 @@ def _choice(data: dict[str, Any], key: str, allowed: tuple[str, ...]) -> str | N
 
 def _flag(data: dict[str, Any], key: str, *, nullable: bool) -> bool | None:
     value = data.get(key)
-    if value is None:
+    if value is None or value == NONE:
         return None if nullable else False
+    if nullable and value in ("yes", "no"):
+        return value == "yes"
     if not isinstance(value, bool):
         raise ValueError(f"{key} nao e booleano")
     return value
