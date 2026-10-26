@@ -7,7 +7,7 @@ import { usePatchAppointment, useToday } from "../../hooks/queries";
 import { whenLabel } from "../../lib/agenda";
 import { saveErrorMessage } from "../../lib/errors";
 import { idleBadge, idleLevel } from "../../lib/format";
-import { SECTOR_COLOR, SECTOR_LABEL } from "../../lib/sectors";
+import { useSectorBook } from "../../hooks/useSectorBook";
 
 const AGE_COLOR = ["var(--age-0)", "var(--age-1)", "var(--age-2)"];
 
@@ -29,6 +29,7 @@ function voice(decisions: number, attention: number): string {
 }
 
 function Row({ card, note, onOpen }: { card: Card; note: string; onOpen: (card: Card) => void }) {
+  const sectors = useSectorBook();
   const level = idleLevel(card.idle_hours);
   return (
     <button type="button" className="today-row" onClick={() => onOpen(card)}>
@@ -41,8 +42,8 @@ function Row({ card, note, onOpen }: { card: Card; note: string; onOpen: (card: 
       </span>
       <span className="today-tags">
         {card.contact?.priority ? <span className="vip-tag">Prioritário</span> : null}
-        <span className="sector" style={{ "--dot": SECTOR_COLOR[card.sector] } as CSSProperties}>
-          {SECTOR_LABEL[card.sector]}
+        <span className="sector" style={{ "--dot": sectors.color(card.sector) } as CSSProperties}>
+          {sectors.label(card.sector)}
         </span>
       </span>
     </button>

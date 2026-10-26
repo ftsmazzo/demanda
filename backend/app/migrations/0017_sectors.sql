@@ -15,15 +15,18 @@ CREATE TABLE sectors (
 CREATE FUNCTION seed_default_sectors(target uuid) RETURNS void
 LANGUAGE sql SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
-    INSERT INTO sectors (tenant_id, slug, label, color, system)
-    VALUES (target, 'triagem', 'Triagem', '#7b8a84', true),
-           (target, 'fiscal', 'Fiscal', '#3a6ea5', false),
-           (target, 'contabil', 'Contábil', '#7a8450', false),
-           (target, 'dp', 'Pessoal', '#a8573e', false),
-           (target, 'societario', 'Societário', '#6b4e7a', false),
-           (target, 'financeiro', 'Financeiro', '#c28f2c', false),
-           (target, 'rh-interno', 'RH interno', '#8e3b55', true),
-           (target, 'consultoria', 'Consultoria', '#2f7f86', false)
+    -- created_at escalonado: a ordem da lista e a ordem de criacao
+    INSERT INTO sectors (tenant_id, slug, label, color, system, created_at)
+    SELECT target, slug, label, color, system, now() + (position * interval '1 millisecond')
+    FROM (VALUES (1, 'triagem', 'Triagem', '#7b8a84', true),
+                 (2, 'fiscal', 'Fiscal', '#3a6ea5', false),
+                 (3, 'contabil', 'Contábil', '#7a8450', false),
+                 (4, 'dp', 'Pessoal', '#a8573e', false),
+                 (5, 'societario', 'Societário', '#6b4e7a', false),
+                 (6, 'financeiro', 'Financeiro', '#c28f2c', false),
+                 (7, 'rh-interno', 'RH interno', '#8e3b55', true),
+                 (8, 'consultoria', 'Consultoria', '#2f7f86', false)
+    ) AS defaults (position, slug, label, color, system)
     ON CONFLICT DO NOTHING
 $$;
 REVOKE ALL ON FUNCTION seed_default_sectors(uuid) FROM PUBLIC;

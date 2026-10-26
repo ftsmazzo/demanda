@@ -17,7 +17,8 @@ import { useMoveDemand } from "../../hooks/move";
 import { useBoard, useUsers } from "../../hooks/queries";
 import { moveErrorMessage } from "../../lib/errors";
 import { voiceSentence } from "../../lib/format";
-import { SECTORS, SECTOR_LABEL, STATUSES } from "../../lib/sectors";
+import { useSectorBook } from "../../hooks/useSectorBook";
+import { STATUSES } from "../../lib/sectors";
 import { laneKeyboardCoordinates } from "./keyboard";
 import { CardBody } from "./DemandCard";
 import { Lane } from "./Lane";
@@ -27,6 +28,7 @@ const canSeeHr = (me: Me) => me.role === "socio" || me.sectors.includes("rh-inte
 
 export function BoardPage() {
   const me = useCurrentUser();
+  const book = useSectorBook();
   const [params, setParams] = useSearchParams();
   const sector = (params.get("setor") ?? "") as Sector | "";
   const person = params.get("pessoa") ?? "";
@@ -114,11 +116,13 @@ export function BoardPage() {
             onChange={(event) => update("setor", event.target.value)}
           >
             <option value="">Todos os setores</option>
-            {SECTORS.filter((item) => item !== "rh-interno" || canSeeHr(me)).map((item) => (
-              <option key={item} value={item}>
-                {SECTOR_LABEL[item]}
-              </option>
-            ))}
+            {book.active
+              .filter((item) => item.slug !== "rh-interno" || canSeeHr(me))
+              .map((item) => (
+                <option key={item.slug} value={item.slug}>
+                  {item.label}
+                </option>
+              ))}
           </select>
           <button
             type="button"
@@ -143,7 +147,7 @@ export function BoardPage() {
               ))}
             </select>
           ) : null}
-          {manager && sectorsFor(me).length > 0 ? (
+          {manager && sectorsFor(me, book.active).length > 0 ? (
             <button className="btn btn-primary" type="button" onClick={() => setCreating(true)}>
               Nova demanda
             </button>

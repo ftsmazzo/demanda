@@ -142,7 +142,7 @@ A IA so identifica a intencao e os nomes citados; consultas, listas, contas de d
 
 Os setores sao dados do tenant (tabela `sectors`, com RLS), nao uma lista fixa no codigo. Um tenant novo nasce com os oito padrao (gatilho no banco); `triagem` e `rh-interno` sao do sistema e nao podem ser desligados. O banco guarda o setor de demandas, usuarios e classificacoes por chave estrangeira `(tenant_id, setor)`, entao um setor de outro escritorio e recusado.
 
-- `GET /api/v1/sectors` (qualquer usuario): setores ativos, `triagem` primeiro; `rh-interno` so aparece para quem tem acesso. Socio pode passar `?include_inactive=true`.
+- `GET /api/v1/sectors` (qualquer usuario): setores ativos, `triagem` primeiro; `rh-interno` so aparece para quem tem acesso. `?include_inactive=true` traz tambem os desligados (para dar nome aos itens antigos).
 - `POST /api/v1/sectors` (so socio): `{label, color?}`. O identificador (`slug`) vem do nome sem acento ("Juridico Trabalhista" vira `juridico-trabalhista`); nome repetido (mesmo slug) responde 409.
 - `PATCH /api/v1/sectors/{slug}` (so socio): `label`, `color` e `active`. O slug nunca muda. Desligar esconde o setor de trabalho novo (criar, mover, IA) e mantem o que ja existe.
 

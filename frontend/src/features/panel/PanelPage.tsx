@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import type { Card } from "../../api/types";
 import { useBoard } from "../../hooks/queries";
 import { idleLevel, spanText } from "../../lib/format";
@@ -98,6 +98,11 @@ export function PanelPage() {
               ? `A demanda mais esquecida está parada há ${spanText(stuck[0].idle_hours)}: ${stuck[0].title}.`
               : "Nenhuma demanda aberta. Tudo em dia."}
           </p>
+        </div>
+        <div className="toolbar">
+          <Link className="btn" to="/setores">
+            Setores do escritório
+          </Link>
         </div>
       </div>
       {stuck.length ? (

@@ -4,7 +4,7 @@ import type { Card } from "../../api/types";
 import { Icon } from "../../components/Icon";
 import { ageFill, idleBadge, idleLevel, initials } from "../../lib/format";
 import { kindTag } from "../../lib/kinds";
-import { SECTOR_COLOR, SECTOR_LABEL } from "../../lib/sectors";
+import { useSectorBook } from "../../hooks/useSectorBook";
 
 const AGE_COLOR = ["var(--age-0)", "var(--age-1)", "var(--age-2)"];
 const MAX_SEGMENTS = 8;
@@ -43,6 +43,7 @@ export function Avatar({ name }: { name: string | null }) {
 
 /** O conteudo visual do card, sem comportamento: serve ao card e ao "fantasma" do arrastar. */
 export function CardBody({ card, index }: { card: Card; index: number }) {
+  const sectors = useSectorBook();
   const closed = card.status === "concluido";
   const level = idleLevel(card.idle_hours);
   const flagged = !closed && card.urgency !== "normal";
@@ -62,8 +63,8 @@ export function CardBody({ card, index }: { card: Card; index: number }) {
       {card.summary ? <span className="card-summary">{card.summary}</span> : null}
       <span className="card-meta">
         <span className="card-tags">
-          <span className="sector" style={{ "--dot": SECTOR_COLOR[card.sector] } as CSSProperties}>
-            {SECTOR_LABEL[card.sector]}
+          <span className="sector" style={{ "--dot": sectors.color(card.sector) } as CSSProperties}>
+            {sectors.label(card.sector)}
           </span>
           {card.sector === "rh-interno" ? (
             <span role="img" aria-label="Acesso restrito" title="Acesso restrito" className="lock">

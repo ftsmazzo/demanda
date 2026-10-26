@@ -4,7 +4,7 @@ import type { Me } from "../../api/types";
 import { Icon } from "../../components/Icon";
 import { useDemand } from "../../hooks/demand";
 import { idleSentence } from "../../lib/format";
-import { SECTOR_COLOR, SECTOR_LABEL } from "../../lib/sectors";
+import { useSectorBook } from "../../hooks/useSectorBook";
 import { CaseAppointments, CaseHistory, CaseSummary, ConversationLink, ReviewNotice } from "./CaseParts";
 import { Conversation } from "./Conversation";
 import { Properties } from "./Properties";
@@ -18,6 +18,7 @@ interface Props {
 
 export function DemandDrawer({ id, me, onClose }: Props) {
   const { data, isPending, error, refetch } = useDemand(id);
+  const sectors = useSectorBook();
   const closeButton = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -43,8 +44,8 @@ export function DemandDrawer({ id, me, onClose }: Props) {
       <div className="drawer-head">
         <div className="drawer-top">
           {data ? (
-            <span className="sector" style={{ "--dot": SECTOR_COLOR[data.sector] } as CSSProperties}>
-              {SECTOR_LABEL[data.sector]}
+            <span className="sector" style={{ "--dot": sectors.color(data.sector) } as CSSProperties}>
+              {sectors.label(data.sector)}
             </span>
           ) : (
             <span />

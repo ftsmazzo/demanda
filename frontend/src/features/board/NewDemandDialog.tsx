@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import type { Me, Sector, Urgency, UserOut } from "../../api/types";
+import type { Me, Sector, SectorInfo, Urgency, UserOut } from "../../api/types";
 import { useCreateDemand } from "../../hooks/demand";
 import { saveErrorMessage } from "../../lib/errors";
-import { SECTORS, SECTOR_LABEL, URGENCY_LABEL } from "../../lib/sectors";
+import { useSectorBook } from "../../hooks/useSectorBook";
+import { URGENCY_LABEL } from "../../lib/sectors";
 
 interface Props {
   me: Me;
@@ -13,13 +14,16 @@ interface Props {
 
 const URGENCIES = Object.keys(URGENCY_LABEL) as Urgency[];
 
-export function sectorsFor(me: Me): Sector[] {
-  if (me.role === "socio") return SECTORS.filter((sector) => sector !== "triagem");
-  return SECTORS.filter((sector) => me.sectors.includes(sector));
+/** Setores em que a pessoa pode abrir demanda: socio em todos (menos a triagem), gestor nos seus. */
+export function sectorsFor(me: Me, active: SectorInfo[]): Sector[] {
+  const slugs = active.map((item) => item.slug);
+  if (me.role === "socio") return slugs.filter((sector) => sector !== "triagem");
+  return slugs.filter((sector) => me.sectors.includes(sector));
 }
 
 export function NewDemandDialog({ me, users, onClose, onCreated }: Props) {
-  const sectors = sectorsFor(me);
+  const book = useSectorBook();
+  const sectors = sectorsFor(me, book.active);
   const create = useCreateDemand();
   const titleField = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState("");
@@ -111,7 +115,7 @@ export function NewDemandDialog({ me, users, onClose, onCreated }: Props) {
             <select className="input" value={sector} onChange={(event) => setSector(event.target.value as Sector)}>
               {sectors.map((item) => (
                 <option key={item} value={item}>
-                  {SECTOR_LABEL[item]}
+                  {book.label(item)}
                 </option>
               ))}
             </select>

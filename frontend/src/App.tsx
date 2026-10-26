@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import { SectorsPage } from "./features/sectors/SectorsPage";
 import { AppShell, RequireAuth, RequireRole } from "./components/AppShell";
 import { BoardPage } from "./features/board/BoardPage";
 import { AgendaPage } from "./features/agenda/AgendaPage";
@@ -31,6 +32,14 @@ export function AppRoutes() {
             element={
               <RequireRole roles={["socio"]}>
                 <PanelPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="setores"
+            element={
+              <RequireRole roles={["socio"]}>
+                <SectorsPage />
               </RequireRole>
             }
           />

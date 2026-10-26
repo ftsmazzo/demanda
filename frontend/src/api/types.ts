@@ -1,13 +1,14 @@
 export type Status = "novo" | "em_andamento" | "aguardando" | "concluido";
-export type Sector =
-  | "triagem"
-  | "fiscal"
-  | "contabil"
-  | "dp"
-  | "societario"
-  | "financeiro"
-  | "rh-interno"
-  | "consultoria";
+/** Identificador do setor (slug). Os setores sao do escritorio: a lista vem de GET /sectors. */
+export type Sector = string;
+
+export interface SectorInfo {
+  slug: Sector;
+  label: string;
+  color: string;
+  system: boolean;
+  active: boolean;
+}
 export type Urgency = "normal" | "alta" | "critica";
 export type Kind = "tarefa" | "compromisso" | "duvida" | "documento" | "cobranca" | "reclamacao";
 export type ContactKind = "cliente" | "fornecedor" | "colaborador" | "desconhecido";

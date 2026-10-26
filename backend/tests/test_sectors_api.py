@@ -50,6 +50,16 @@ def test_a_new_tenant_starts_with_the_standard_sectors(api_client, tenant_id, ma
 
     body = listing(api_client, socio)
 
+    assert [item["slug"] for item in body][:8] == [
+        "triagem",
+        "fiscal",
+        "contabil",
+        "dp",
+        "societario",
+        "financeiro",
+        "rh-interno",
+        "consultoria",
+    ]
     assert DEFAULTS <= {item["slug"] for item in body}
     by_slug = {item["slug"]: item for item in body}
     assert by_slug["dp"]["label"] == "Pessoal" and by_slug["dp"]["color"].startswith("#")

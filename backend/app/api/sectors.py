@@ -72,8 +72,7 @@ def _same_label(conn: psycopg.Connection, label: str, *, except_slug: str | None
 def list_sectors(
     user: CurrentUserDep, db: DbDep, include_inactive: Annotated[bool, Query()] = False
 ) -> list[SectorOut]:
-    everything = include_inactive and user.role == "socio"
-    where = "TRUE" if everything else "active"
+    where = "TRUE" if include_inactive else "active"
     with db.tenant_transaction(user.tenant_id) as conn:
         rows = conn.execute(
             f"SELECT {_COLUMNS} FROM sectors WHERE {where} "

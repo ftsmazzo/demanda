@@ -1,7 +1,8 @@
 import type { Detail, Me, Sector, Status, Urgency } from "../../api/types";
 import { useUsers } from "../../hooks/queries";
 import { usePatchDemand } from "../../hooks/demand";
-import { SECTORS, SECTOR_LABEL, STATUSES, STATUS_SINGULAR, URGENCY_LABEL } from "../../lib/sectors";
+import { useSectorBook } from "../../hooks/useSectorBook";
+import { STATUSES, STATUS_SINGULAR, URGENCY_LABEL } from "../../lib/sectors";
 import { saveErrorMessage } from "../../lib/errors";
 
 const URGENCIES = Object.keys(URGENCY_LABEL) as Urgency[];
@@ -12,6 +13,11 @@ export function Properties({ demand, me }: { demand: Detail; me: Me }) {
   const manager = me.role !== "colaborador";
   const users = useUsers(manager);
   const save = (change: Parameters<typeof patch.mutate>[0]) => patch.mutate(change);
+  const sectors = useSectorBook();
+  // o setor atual entra mesmo se ja foi desligado, para o campo nao mentir
+  const sectorSlugs = [...new Set([...sectors.active.map((item) => item.slug), demand.sector])].filter(
+    (slug) => slug !== "rh-interno" || canSeeHr(me) || slug === demand.sector,
+  );
 
   return (
     <>
@@ -62,9 +68,9 @@ export function Properties({ demand, me }: { demand: Detail; me: Me }) {
                 value={demand.sector}
                 onChange={(event) => save({ sector: event.target.value as Sector })}
               >
-                {SECTORS.filter((s) => s !== "rh-interno" || canSeeHr(me)).map((sector) => (
+                {sectorSlugs.map((sector) => (
                   <option key={sector} value={sector}>
-                    {SECTOR_LABEL[sector]}
+                    {sectors.label(sector)}
                   </option>
                 ))}
               </select>

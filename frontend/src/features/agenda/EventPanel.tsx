@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import type { Appointment, AppointmentStatus } from "../../api/types";
 import { whenLabel } from "../../lib/agenda";
-import { SECTOR_COLOR, SECTOR_LABEL } from "../../lib/sectors";
+import { useSectorBook } from "../../hooks/useSectorBook";
 
 const STATE_LABEL: Record<AppointmentStatus, string> = {
   proposed: "Proposto",
@@ -20,6 +20,7 @@ interface Props {
 }
 
 export function EventPanel({ item, canEdit, busy, onStatus, onOpenCase, onClose }: Props) {
+  const sectors = useSectorBook();
   return (
     <section className="event-panel" aria-label="Compromisso selecionado" data-status={item.status}>
       <div className="event-panel-head">
@@ -32,8 +33,8 @@ export function EventPanel({ item, canEdit, busy, onStatus, onOpenCase, onClose 
       <p className="event-panel-when">{whenLabel(item.starts_at, item.all_day)}</p>
       <p className="agenda-meta">
         {item.contact ? <span>{item.contact.name ?? "Contato sem nome"}</span> : null}
-        <span className="sector" style={{ "--dot": SECTOR_COLOR[item.sector] } as CSSProperties}>
-          {SECTOR_LABEL[item.sector]}
+        <span className="sector" style={{ "--dot": sectors.color(item.sector) } as CSSProperties}>
+          {sectors.label(item.sector)}
         </span>
       </p>
       <div className="event-panel-actions">

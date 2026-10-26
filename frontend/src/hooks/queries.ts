@@ -86,6 +86,35 @@ export function usePatchAppointment() {
   });
 }
 
+export function useSectors() {
+  const { api } = useAuth();
+  return useQuery({
+    queryKey: ["sectors"],
+    queryFn: () => api.sectors(),
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+}
+
+export function useCreateSector() {
+  const { api } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { label: string; color?: string }) => api.createSector(body),
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: ["sectors"] }),
+  });
+}
+
+export function usePatchSector() {
+  const { api } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ slug, ...patch }: { slug: string; label?: string; color?: string; active?: boolean }) =>
+      api.patchSector(slug, patch),
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: ["sectors"] }),
+  });
+}
+
 export function useConversation(contactId: string | undefined) {
   const { api } = useAuth();
   return useQuery({

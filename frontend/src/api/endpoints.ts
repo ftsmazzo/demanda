@@ -15,6 +15,7 @@ import type {
   Detail,
   LoginResponse,
   Me,
+  SectorInfo,
   Subtask,
   UserOut,
 } from "./types";
@@ -55,6 +56,11 @@ export function createApi(client: Client) {
         query: { since: range.since, until: range.until, status: range.status, limit: 200 },
       }),
     today: () => request<TodayData>("GET", "/api/v1/today"),
+    sectors: () =>
+      request<SectorInfo[]>("GET", "/api/v1/sectors", undefined, { query: { include_inactive: "true" } }),
+    createSector: (body: { label: string; color?: string }) => request<SectorInfo>("POST", "/api/v1/sectors", body),
+    patchSector: (slug: string, patch: { label?: string; color?: string; active?: boolean }) =>
+      request<SectorInfo>("PATCH", `/api/v1/sectors/${safeId(slug)}`, patch),
     conversations: (filters: { q?: string; waiting?: boolean } = {}) =>
       request<ConversationSummary[]>("GET", "/api/v1/conversations", undefined, {
         query: { q: filters.q, waiting: filters.waiting ? "true" : undefined },
