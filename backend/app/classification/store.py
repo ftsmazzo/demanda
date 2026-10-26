@@ -11,7 +11,7 @@ from collections import Counter
 from typing import Any
 from uuid import UUID
 
-from app.classification.domain import Context, Decision
+from app.classification.domain import Classification, Context, Decision
 from app.classification.llm import LLMClassifier
 from app.classification.rules import RULES_VERSION
 from app.classification.service import classify_message
@@ -30,6 +30,10 @@ _PENDING = """
            EXISTS (
                SELECT 1 FROM demands d
                WHERE d.contact_id = m.contact_id AND d.status <> 'concluido'
+           ),
+           EXISTS (
+               SELECT 1 FROM agent_notifications an
+               WHERE an.body <> '' AND btrim(an.body) = btrim(m.text)
            )
     FROM messages m LEFT JOIN contacts ct ON ct.id = m.contact_id
     WHERE m.direction = 'in'
@@ -61,6 +65,15 @@ _INSERT = """
 """
 
 
+# O WhatsApp do escritorio tambem registra o que o agente manda aos socios (a conversa com o
+# numero do agente esta no mesmo telefone). Sem este filtro, o aviso viraria um compromisso novo,
+# que geraria outro aviso, e assim por diante.
+_AGENT_ECHO = Decision(
+    "noise",
+    Classification("triagem", "ruido", "normal", None, 1.0, "rule", False, "agent_echo"),
+)
+
+
 def classify_pending(
     db: Database,
     tenant_id: UUID,
@@ -85,6 +98,7 @@ def classify_pending(
             sent_at,
             contact_kind,
             has_open,
+            agent_echo,
         ) in pending:
             recent = conn.execute(
                 _RECENT, (tenant_id, channel_id, phone, sent_at, RECENT_MESSAGES)
@@ -95,12 +109,12 @@ def classify_pending(
                 has_media=has_media,
                 recent=tuple(row[0] for row in reversed(recent)),
             )
-            work.append((message_id, text or "", context))
+            work.append((message_id, text or "", context, agent_echo))
 
     model = getattr(llm, "model", None)
     counts: Counter[str] = Counter()
-    for message_id, text, context in work:
-        decision = classify_message(text, context, llm=llm)
+    for message_id, text, context, agent_echo in work:
+        decision = _AGENT_ECHO if agent_echo else classify_message(text, context, llm=llm)
         if decision.classification.reason in _TRANSIENT_REASONS:
             counts["deferred"] += 1
             continue

@@ -76,7 +76,11 @@ def agent_webhook(
         }
         if len(found) != 1:
             # desconhecido: ignora em silencio; em mais de uma empresa: nao adivinha
-            logger.info("mensagem ao agente sem destinatario unico (%d)", len(found))
+            logger.warning(
+                "mensagem ao agente de numero final %s: %d destinatario(s) encontrado(s)",
+                message.contact_phone[-4:],
+                len(found),
+            )
             continue
         recipient_id, tenant_id = next(iter(found))
         reply = handle_inbound(
