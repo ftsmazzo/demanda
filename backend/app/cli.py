@@ -10,7 +10,7 @@ from datetime import datetime
 
 import psycopg
 
-from app.agent.runner import QUIET_BEFORE, QUIET_FROM
+from app.agent.runner import DAILY_CAP, QUIET_BEFORE, QUIET_FROM
 from app.cases.llm import build_case_llm
 from app.classification.factory import build_classifier
 from app.classification.store import classify_pending
@@ -94,6 +94,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "agent-check", help="diagnostico do agente: configuracao, horario e avisos pendentes"
     )
     check.add_argument("--tenant-slug", required=True)
+
+    retry = sub.add_parser(
+        "agent-retry", help="recoloca na fila os avisos das ultimas 24 h que foram pulados"
+    )
+    retry.add_argument("--tenant-slug", required=True)
 
     sub.add_parser("stats", help="contagem de mensagens e latencia por canal (medicao do spike)")
 
@@ -454,6 +459,12 @@ def _agent_check(conn: psycopg.Connection, args: argparse.Namespace) -> int:
         "AND a.created_at >= now() - interval '24 hours' ORDER BY a.created_at",
         (tenant_id,),
     ).fetchall()
+    used = conn.execute(
+        "SELECT count(*) FROM agent_notifications WHERE tenant_id = %s AND kind <> 'reply' "
+        "AND status IN ('sent', 'dry_run') AND created_at >= now() - interval '24 hours'",
+        (tenant_id,),
+    ).fetchone()[0]
+    print(f"avisos das ultimas 24 h: {used} de {DAILY_CAP} (por pessoa)")
     print(f"compromissos propostos nas ultimas 24 h: {len(rows)}")
     for _, title, starts_at, told in rows:
         when = starts_at.astimezone(zone).strftime("%d/%m %H:%M")
@@ -461,6 +472,21 @@ def _agent_check(conn: psycopg.Connection, args: argparse.Namespace) -> int:
         print(f'  - "{title[:60]}" ({when}) -> {state}')
     print("ultimos avisos:")
     _agent_outbox(conn, argparse.Namespace(tenant_slug=args.tenant_slug, limit=5))
+    return 0
+
+
+def _agent_retry(conn: psycopg.Connection, args: argparse.Namespace) -> int:
+    tenant_id = _tenant_id(conn, args.tenant_slug)
+    if tenant_id is None:
+        return 1
+    done = conn.execute(
+        "UPDATE agent_notifications SET status = 'pending', attempts = 0, last_attempt_at = NULL "
+        "WHERE tenant_id = %s AND status = 'skipped' AND body <> '' "
+        "AND created_at >= now() - interval '24 hours'",
+        (tenant_id,),
+    )
+    word = "aviso" if done.rowcount == 1 else "avisos"
+    print(f"{done.rowcount} {word} de volta na fila (saem no proximo ciclo, dentro do horario)")
     return 0
 
 
@@ -543,6 +569,9 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "recipients":
             return _list_recipients(conn, args)
+
+        if args.command == "agent-retry":
+            return _agent_retry(conn, args)
 
         if args.command == "agent-check":
             return _agent_check(conn, args)

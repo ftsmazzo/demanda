@@ -124,3 +124,43 @@ def test_an_unknown_tenant_is_an_error(admin_url, monkeypatch, capsys):
     code, _ = check(monkeypatch, admin_url, capsys, "nao-existe")
 
     assert code == 1
+
+
+def test_check_shows_how_much_of_the_daily_budget_is_used(
+    admin_url, admin_conn, tenant_id, monkeypatch, capsys
+):
+    recipient = add_recipient(admin_conn, tenant_id, "5511999990003")
+    for number in range(3):
+        admin_conn.execute(
+            "INSERT INTO agent_notifications (tenant_id, recipient_id, kind, dedupe_key, body, "
+            "status) VALUES (%s, %s, 'stuck', %s, 'x', 'sent')",
+            (tenant_id, recipient, f"k{number}"),
+        )
+
+    _, out = check(monkeypatch, admin_url, capsys, slug_of(admin_conn, tenant_id))
+
+    assert "avisos das ultimas 24 h: 3 de 20" in out
+
+
+def test_retry_puts_recent_skipped_alerts_back_in_the_queue(
+    admin_url, admin_conn, tenant_id, monkeypatch, capsys
+):
+    recipient = add_recipient(admin_conn, tenant_id, "5511999990004")
+    admin_conn.execute(
+        "INSERT INTO agent_notifications (tenant_id, recipient_id, kind, dedupe_key, body, status) "
+        "VALUES (%s, %s, 'appointment', 'a', 'Texto do aviso', 'skipped'), "
+        "(%s, %s, 'stuck', 'b', '', 'skipped')",
+        (tenant_id, recipient, tenant_id, recipient),
+    )
+    monkeypatch.setenv("DATABASE_URL", admin_url)
+
+    code = cli.main(["agent-retry", "--tenant-slug", slug_of(admin_conn, tenant_id)])
+
+    states = dict(
+        admin_conn.execute(
+            "SELECT dedupe_key, status FROM agent_notifications WHERE tenant_id = %s", (tenant_id,)
+        ).fetchall()
+    )
+    assert code == 0
+    assert states == {"a": "pending", "b": "skipped"}  # o vazio nao tem o que enviar
+    assert "1 aviso" in capsys.readouterr().out

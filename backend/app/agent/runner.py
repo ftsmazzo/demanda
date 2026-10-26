@@ -29,7 +29,7 @@ STUCK_FROM = 9
 STUCK_ALERT_HOURS = 72
 STUCK_SUMMARY_HOURS = 24
 APPOINTMENT_WINDOW = timedelta(hours=24)
-DAILY_CAP = 12
+DAILY_CAP = 20  # avisos (nao respostas) por pessoa em 24 h
 RETRY_AFTER = timedelta(minutes=5)
 MAX_ATTEMPTS = 3
 
@@ -55,17 +55,22 @@ def _enqueue(
     body: str,
     now: datetime,
 ) -> None:
-    recent = conn.execute(
-        "SELECT count(*) FROM agent_notifications WHERE recipient_id = %s "
-        "AND status IN ('sent', 'dry_run') AND created_at >= %s",
-        (recipient_id, now - timedelta(hours=24)),
-    ).fetchone()[0]
-    status = "skipped" if (not body or recent >= DAILY_CAP) else "pending"
+    """Poe o aviso na caixa de saida. Sem texto vira 'skipped' (nada a dizer). No limite diario
+    nao grava nada: o aviso espera e sai quando houver folga, em vez de se perder."""
+    if body:
+        recent = conn.execute(
+            "SELECT count(*) FROM agent_notifications WHERE recipient_id = %s "
+            "AND kind <> 'reply' AND status IN ('sent', 'dry_run') AND created_at >= %s",
+            (recipient_id, now - timedelta(hours=24)),
+        ).fetchone()[0]
+        if recent >= DAILY_CAP:
+            logger.info("limite diario de avisos atingido para o destinatario %s", recipient_id)
+            return
     conn.execute(
         "INSERT INTO agent_notifications (tenant_id, recipient_id, kind, dedupe_key, body, status, "
         "created_at) VALUES (%s, %s, %s, %s, %s, %s, %s) "
         "ON CONFLICT (tenant_id, recipient_id, kind, dedupe_key) DO NOTHING",
-        (tenant_id, recipient_id, kind, key, body, status, now),
+        (tenant_id, recipient_id, kind, key, body, "pending" if body else "skipped", now),
     )
 
 

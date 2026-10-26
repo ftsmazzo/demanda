@@ -136,17 +136,40 @@ def test_no_stuck_alert_when_nothing_is_stuck_and_it_does_not_check_again(
     assert [row[:2] for row in outbox(admin_conn, tenant_id, "stuck")] == [("stuck", "skipped")]
 
 
-def test_a_recipient_over_the_daily_cap_is_skipped_not_flooded(database, admin_conn, tenant_id):
-    recipient = add_recipient(admin_conn, tenant_id, PHONE)
-    for number in range(12):
-        admin_conn.execute(
+def fill_daily_cap(conn, tenant_id, recipient, kind, count, *, when=MON_MORNING):
+    for number in range(count):
+        conn.execute(
             "INSERT INTO agent_notifications (tenant_id, recipient_id, kind, dedupe_key, body, "
-            "status, sent_at, created_at) VALUES (%s, %s, 'appointment', %s, 'x', 'sent', %s, %s)",
-            (tenant_id, recipient, f"velho-{number}", MON_MORNING, MON_MORNING),
+            "status, sent_at, created_at) VALUES (%s, %s, %s, %s, 'x', 'sent', %s, %s)",
+            (tenant_id, recipient, kind, f"velho-{kind}-{number}", when, when),
         )
+
+
+def test_a_recipient_over_the_daily_cap_is_not_flooded_and_nothing_is_lost(
+    database, admin_conn, tenant_id
+):
+    recipient = add_recipient(admin_conn, tenant_id, PHONE)
+    fill_daily_cap(admin_conn, tenant_id, recipient, "appointment", 20)
     add_demand(admin_conn, tenant_id, title="Esquecida", idle_hours=120, now=MON_MORNING)
     sender = FakeSender()
 
     cycle(database, tenant_id, sender, MON_MORNING + timedelta(minutes=1))
 
     assert sender.sent == []
+    assert outbox(admin_conn, tenant_id, "stuck") == []  # nada foi descartado: so adiado
+
+    # passadas 24 h, o limite folga e o aviso que ficou esperando sai
+    later = MON_MORNING + timedelta(hours=24, minutes=5)
+    cycle(database, tenant_id, sender, later)
+    assert len(sender.sent) == 1 and "Esquecida" in sender.sent[0][1]
+
+
+def test_replies_to_the_owner_do_not_use_up_the_alert_budget(database, admin_conn, tenant_id):
+    recipient = add_recipient(admin_conn, tenant_id, PHONE)
+    fill_daily_cap(admin_conn, tenant_id, recipient, "reply", 40)
+    add_demand(admin_conn, tenant_id, title="Esquecida", idle_hours=120, now=MON_MORNING)
+    sender = FakeSender()
+
+    cycle(database, tenant_id, sender, MON_MORNING + timedelta(minutes=1))
+
+    assert len(sender.sent) == 1
