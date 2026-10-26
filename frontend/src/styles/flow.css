@@ -642,3 +642,12 @@
     transition: none;
   }
 }
+
+.kind-tag {
+  padding: 1px 7px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 999px;
+  color: var(--ink-2);
+  font-size: 11.5px;
+  font-weight: 600;
+}

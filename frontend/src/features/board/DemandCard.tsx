@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import type { Card } from "../../api/types";
 import { Icon } from "../../components/Icon";
 import { ageFill, idleBadge, idleLevel, initials } from "../../lib/format";
+import { kindTag } from "../../lib/kinds";
 import { SECTOR_COLOR, SECTOR_LABEL } from "../../lib/sectors";
 
 const AGE_COLOR = ["var(--age-0)", "var(--age-1)", "var(--age-2)"];
@@ -69,6 +70,7 @@ export function CardBody({ card, index }: { card: Card; index: number }) {
               <Icon name="lock" size={13} />
             </span>
           ) : null}
+          {kindTag(card.kind) ? <span className="kind-tag">{kindTag(card.kind)}</span> : null}
           {card.contact?.priority ? <span className="vip-tag">Prioritário</span> : null}
           {card.needs_review ? <span className="review-tag">Confirmar</span> : null}
           {flagged ? (

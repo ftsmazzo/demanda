@@ -33,6 +33,16 @@ describe("case card", () => {
     expect(within(card).getByText("Confirmar")).toBeInTheDocument();
   });
 
+  it("names the kind of a card that is not an ordinary task", async () => {
+    open([makeCard({ title: "Cobrar extratos", kind: "cobranca" }), makeCard({ title: "Tarefa comum", kind: "tarefa" })]);
+
+    const charge = (await screen.findByText("Cobrar extratos")).closest("button")!;
+    const task = screen.getByText("Tarefa comum").closest("button")!;
+
+    expect(within(charge).getByText("Cobrança")).toBeInTheDocument();
+    expect(within(task).queryByText("Tarefa")).not.toBeInTheDocument();
+  });
+
   it("stays clean for an ordinary card", async () => {
     open([makeCard({ title: "Normal" })]);
 

@@ -5,6 +5,7 @@ import type { Card } from "../../api/types";
 import { useConversation } from "../../hooks/queries";
 import { dayLabel } from "../../lib/agenda";
 import { formatMessageTime, formatPhone } from "../../lib/format";
+import { kindTag } from "../../lib/kinds";
 import { STATUS_SINGULAR } from "../../lib/sectors";
 
 export function ConversationPage() {
@@ -80,12 +81,13 @@ export function ConversationPage() {
         </div>
         <section aria-label="Casos deste contato" className="case-list">
           <h2 className="section-title">
-            Casos <span>{cases.length}</span>
+            O que saiu desta conversa <span>{cases.length}</span>
           </h2>
-          {cases.length === 0 ? <p className="hint">Nenhum caso aberto para este contato.</p> : null}
+          {cases.length === 0 ? <p className="hint">Nada saiu desta conversa ainda.</p> : null}
           {cases.map((item) => (
             <button key={item.id} type="button" className="case-row" onClick={() => open(item)}>
               <span className="case-row-title">{item.title}</span>
+              {kindTag(item.kind) ? <span className="kind-tag">{kindTag(item.kind)}</span> : null}
               {item.summary ? <span className="case-row-summary">{item.summary}</span> : null}
               <span className="case-row-state">{STATUS_SINGULAR[item.status]}</span>
             </button>

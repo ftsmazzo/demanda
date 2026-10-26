@@ -68,6 +68,20 @@ describe("conversation page", () => {
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 
+  it("says what came out of the conversation and of which kind", async () => {
+    open({
+      "GET /api/v1/contacts/c-1/conversation": () => [
+        200,
+        { ...conversation(), cases: [makeCard({ id: "d3", title: "Cobrar extratos", kind: "cobranca" })] },
+      ],
+    });
+
+    const list = await screen.findByRole("region", { name: "Casos deste contato" });
+
+    expect(within(list).getByRole("heading", { name: /O que saiu desta conversa/ })).toBeInTheDocument();
+    expect(within(list).getByText("Cobrança")).toBeInTheDocument();
+  });
+
   it("explains a conversation that is gone or off limits", async () => {
     open({ "GET /api/v1/contacts/c-1/conversation": () => [404, { detail: "x" }] });
 
