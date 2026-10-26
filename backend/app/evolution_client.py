@@ -101,3 +101,37 @@ class EvolutionClient:
             )
         except (OSError, ValueError) as exc:
             raise EvolutionError("falha de rede ao falar com a Evolution") from exc
+
+    def set_webhook(
+        self, instance: str, *, url: str, headers: dict[str, str], events: list[str]
+    ) -> None:
+        """Configura o webhook da instancia (POST /webhook/set/{instancia}), com cabecalhos."""
+        if not _INSTANCE.match(instance):
+            raise EvolutionError("nome de instancia invalido")
+        body = {
+            "webhook": {
+                "enabled": True,
+                "url": url,
+                "headers": headers,
+                "byEvents": False,
+                "base64": False,
+                "events": events,
+            }
+        }
+        try:
+            self._call("POST", f"/webhook/set/{quote(instance)}", body, ok=(200, 201))
+        except (OSError, ValueError) as exc:
+            raise EvolutionError("falha de rede ao falar com a Evolution") from exc
+
+    def find_webhook(self, instance: str) -> dict[str, Any]:
+        """O webhook gravado na instancia (GET /webhook/find/{instancia}); vazio se nao houver."""
+        if not _INSTANCE.match(instance):
+            raise EvolutionError("nome de instancia invalido")
+        try:
+            data = self._call("GET", f"/webhook/find/{quote(instance)}")
+        except (OSError, ValueError) as exc:
+            raise EvolutionError("falha de rede ao falar com a Evolution") from exc
+        if isinstance(data, dict):
+            inner = data.get("webhook")
+            return inner if isinstance(inner, dict) else data
+        return {}

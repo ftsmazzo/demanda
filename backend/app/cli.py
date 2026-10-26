@@ -4,6 +4,7 @@ import argparse
 import getpass
 import os
 import re
+import secrets
 import sys
 
 import psycopg
@@ -13,6 +14,7 @@ from app.classification.store import classify_pending
 from app.core.appointments import backfill_appointments
 from app.core.demands import materialize_demands
 from app.db import Database
+from app.evolution_client import EvolutionClient, EvolutionError
 from app.provisioning import create_channel, create_runtime_role, create_tenant, create_user
 from app.security.tokens import ROLES
 
@@ -79,6 +81,11 @@ def _build_parser() -> argparse.ArgumentParser:
     outbox = sub.add_parser("agent-outbox", help="ultimos avisos do agente e o estado de cada um")
     outbox.add_argument("--tenant-slug")
     outbox.add_argument("--limit", type=_review_limit, default=15, help="quantidade (1 a 200)")
+
+    sub.add_parser(
+        "setup-agent-webhook",
+        help="configura na Evolution o webhook da instancia do agente (segredo e cabecalho)",
+    )
 
     sub.add_parser("stats", help="contagem de mensagens e latencia por canal (medicao do spike)")
 
@@ -337,6 +344,56 @@ def _agent_outbox(conn: psycopg.Connection, args: argparse.Namespace) -> int:
     return 0
 
 
+_AGENT_WEBHOOK_ENV = (
+    "EVOLUTION_URL",
+    "EVOLUTION_API_KEY",
+    "AGENT_INSTANCE",
+    "AGENT_APP_URL",
+)
+
+
+def _evolution_from_env() -> EvolutionClient:
+    return EvolutionClient(os.environ["EVOLUTION_URL"], os.environ["EVOLUTION_API_KEY"])
+
+
+def _setup_agent_webhook() -> int:
+    missing = [name for name in _AGENT_WEBHOOK_ENV if not os.environ.get(name)]
+    if missing:
+        print("faltam variaveis no ambiente da api: " + ", ".join(missing), file=sys.stderr)
+        return 2
+    secret = os.environ.get("AGENT_WEBHOOK_SECRET")
+    if not secret:
+        print("AGENT_WEBHOOK_SECRET nao esta definido. Gerei um segredo para voce.")
+        print("Salve esta linha no ambiente do servico api, faca Implantar e rode de novo:")
+        print("AGENT_WEBHOOK_SECRET=" + secrets.token_urlsafe(32))
+        return 2
+    instance = os.environ["AGENT_INSTANCE"]
+    url = os.environ["AGENT_APP_URL"].rstrip("/") + "/webhooks/agent"
+    events = ["MESSAGES_UPSERT"]
+    client = _evolution_from_env()
+    try:
+        client.set_webhook(instance, url=url, headers={"X-Webhook-Secret": secret}, events=events)
+        stored = client.find_webhook(instance)
+    except EvolutionError as exc:
+        print(f"a Evolution recusou: {exc}", file=sys.stderr)
+        return 1
+    stored_events = [str(e).upper() for e in stored.get("events") or []]
+    if not (
+        stored.get("enabled") and stored.get("url") == url and "MESSAGES_UPSERT" in stored_events
+    ):
+        print("o webhook gravado na Evolution nao confere com o pedido:", file=sys.stderr)
+        print(
+            f"  url={stored.get('url')} ativo={stored.get('enabled')} eventos={stored_events}",
+            file=sys.stderr,
+        )
+        return 1
+    print(f"webhook configurado na instancia {instance}")
+    print(f"  url: {url}")
+    print(f"  eventos: {', '.join(events)}")
+    print("  cabecalho de seguranca: X-Webhook-Secret (valor nao exibido)")
+    return 0
+
+
 def _read_password() -> str | None:
     password = os.environ.get("USER_PASSWORD")
     if password:
@@ -381,6 +438,8 @@ def _create_user(conn: psycopg.Connection, args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
+    if args.command == "setup-agent-webhook":
+        return _setup_agent_webhook()
     database_url = os.environ.get("DATABASE_URL")
     if not database_url:
         print("DATABASE_URL nao definida", file=sys.stderr)
