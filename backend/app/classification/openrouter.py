@@ -40,6 +40,37 @@ def _urllib_post(
         return exc.code, exc.read()
 
 
+MAX_ERROR_SNIPPET = 240
+_SECRET = re.compile(r"(sk-[A-Za-z0-9_-]+|Bearer\s+\S+)")
+
+
+def _safe(text: str) -> str:
+    """Tira espacos extras, esconde qualquer coisa que pareca chave e corta o tamanho."""
+    return _SECRET.sub("[chave]", " ".join(text.split()))[:MAX_ERROR_SNIPPET]
+
+
+def describe_http_error(status: int, raw: bytes) -> str:
+    """Texto curto e seguro do erro do provedor (a mensagem dele, sem a chave nem o corpo todo)."""
+    snippet = ""
+    try:
+        data = json.loads(raw)
+        error = data.get("error") if isinstance(data, dict) else None
+        message = error.get("message") if isinstance(error, dict) else error
+        snippet = message if isinstance(message, str) else ""
+    except (ValueError, AttributeError):
+        snippet = raw.decode("utf-8", errors="ignore")
+    snippet = _safe(snippet)
+    return f"OpenRouter respondeu HTTP {status}" + (f": {snippet}" if snippet else "")
+
+
+def error_detail(payload: dict[str, Any]) -> str:
+    """O motivo que o provedor deu dentro de uma resposta 200 com campo error (ou vazio)."""
+    error = payload.get("error")
+    message = error.get("message") if isinstance(error, dict) else error
+    text = _safe(message) if isinstance(message, str) else ""
+    return f": {text}" if text else ""
+
+
 class OpenRouterClassifier:
     def __init__(
         self,
@@ -89,7 +120,7 @@ class OpenRouterClassifier:
             raise ClassifierUnavailable(f"falha de rede: {type(exc).__name__}") from exc
 
         if status != 200:
-            raise ClassifierUnavailable(f"OpenRouter respondeu HTTP {status}")
+            raise ClassifierUnavailable(describe_http_error(status, raw))
         try:
             payload = json.loads(raw)
         except json.JSONDecodeError as exc:

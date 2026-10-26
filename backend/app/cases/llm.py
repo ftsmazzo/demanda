@@ -12,7 +12,13 @@ import anthropic
 from app.cases.contract import OUTPUT_SCHEMA, CaseDecision, parse_case_output
 from app.cases.prompt import SYSTEM_PROMPT, CaseContext, build_user_prompt
 from app.classification.llm import ClassifierUnavailable
-from app.classification.openrouter import OPENROUTER_URL, PostFn, _urllib_post
+from app.classification.openrouter import (
+    OPENROUTER_URL,
+    PostFn,
+    _urllib_post,
+    describe_http_error,
+    error_detail,
+)
 
 DEFAULT_OPENROUTER_MODEL = "anthropic/claude-haiku-5.5"
 DEFAULT_ANTHROPIC_MODEL = "claude-haiku-5-5"
@@ -72,7 +78,7 @@ class OpenRouterCaseLLM:
         except (OSError, urllib.error.URLError) as exc:
             raise ClassifierUnavailable(f"falha de rede: {type(exc).__name__}") from exc
         if status != 200:
-            raise ClassifierUnavailable(f"OpenRouter respondeu HTTP {status}")
+            raise ClassifierUnavailable(describe_http_error(status, raw))
         try:
             payload = json.loads(raw)
         except json.JSONDecodeError as exc:
@@ -80,7 +86,7 @@ class OpenRouterCaseLLM:
         if not isinstance(payload, dict):
             raise ValueError("resposta do OpenRouter inesperada")
         if payload.get("error"):
-            raise ClassifierUnavailable("OpenRouter devolveu erro")
+            raise ClassifierUnavailable("OpenRouter devolveu erro" + error_detail(payload))
         choices = payload.get("choices")
         if not isinstance(choices, list) or not choices:
             raise ValueError("resposta do OpenRouter sem choices")

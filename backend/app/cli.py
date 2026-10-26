@@ -120,6 +120,11 @@ def _build_parser() -> argparse.ArgumentParser:
     channel_hook.add_argument("--tenant-slug", required=True)
     channel_hook.add_argument("--instance", help="so se a empresa tiver mais de um canal")
 
+    sub.add_parser(
+        "ai-check",
+        help="testa de verdade as tres IAs (classificacao, casos e agente) e mostra o erro exato",
+    )
+
     sub.add_parser("stats", help="contagem de mensagens e latencia por canal (medicao do spike)")
 
     channel = sub.add_parser("create-channel", help="cria um canal e mostra o segredo uma vez")
@@ -597,6 +602,58 @@ def _setup_channel_webhook(conn: psycopg.Connection, args: argparse.Namespace) -
     return 0
 
 
+def _ai_check() -> int:
+    """Faz uma chamada real a cada IA e diz se funcionou ou qual foi o erro."""
+    from zoneinfo import ZoneInfo
+
+    from app.agent.nl.llm import IntentContext
+    from app.cases.prompt import CaseContext
+    from app.classification.domain import Context
+
+    env = os.environ
+    now = datetime.now(ZoneInfo("America/Sao_Paulo"))
+    failed = 0
+
+    def run(label: str, llm, call) -> None:
+        nonlocal failed
+        if llm is None:
+            print(f"{label}: desligada")
+            failed += 1
+            return
+        try:
+            result = call(llm)
+        except Exception as exc:  # o objetivo e mostrar a causa, qualquer que seja
+            print(f"{label}: FALHOU ({type(exc).__name__}: {str(exc)[:300]})")
+            failed += 1
+        else:
+            print(f"{label}: ok ({result})")
+
+    classifier, _ = build_classifier(env)
+    run(
+        "classificacao",
+        classifier,
+        lambda llm: llm.classify("Quando vence o DAS esse mes?", Context(), {}).sector,
+    )
+    case_llm, _ = build_case_llm(env)
+    run(
+        "casos",
+        case_llm,
+        lambda llm: (
+            llm.analyze(
+                "Vamos marcar uma reuniao quarta as 14",
+                CaseContext("Teste", "cliente", now, (), ()),
+            ).action
+        ),
+    )
+    intent_llm, _ = build_intent_llm(env)
+    run(
+        "agente (linguagem natural)",
+        intent_llm,
+        lambda llm: llm.understand("como estamos?", IntentContext(now, ("Ana Lima",))).intent,
+    )
+    return 1 if failed else 0
+
+
 def _read_password() -> str | None:
     password = os.environ.get("USER_PASSWORD")
     if password:
@@ -643,6 +700,8 @@ def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     if args.command == "setup-agent-webhook":
         return _setup_agent_webhook()
+    if args.command == "ai-check":
+        return _ai_check()
     database_url = os.environ.get("DATABASE_URL")
     if not database_url:
         print("DATABASE_URL nao definida", file=sys.stderr)
