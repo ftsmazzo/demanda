@@ -186,3 +186,52 @@ def test_running_twice_does_not_repeat_anything(database, admin_conn, channel):
 
     assert sum(again.values()) == 0
     assert len(demands_of(admin_conn, channel.tenant_id, "xyzcaso12")) == 1
+
+
+def fresh(conn, message_id):
+    conn.execute("UPDATE messages SET provider_timestamp = now() WHERE id = %s", (message_id,))
+
+
+def test_a_recent_message_waits_in_triage_when_the_ai_is_down_and_is_handled_later(
+    database, admin_conn, channel
+):
+    message = say(admin_conn, channel, database, "Preciso da guia xyzespera1", who=phone())
+    fresh(admin_conn, message)
+
+    waiting = run(database, channel.tenant_id, FakeCaseLLM(error=ClassifierUnavailable("fora")))
+
+    assert waiting["deferred"] == 1 and waiting["fallback"] == 0
+    assert demands_of(admin_conn, channel.tenant_id, "xyzespera1") == []
+
+    later = run(database, channel.tenant_id, FakeCaseLLM(decision(title="Guia xyzespera1")))
+
+    assert later["created"] == 1
+    assert len(demands_of(admin_conn, channel.tenant_id, "xyzespera1")) == 1
+
+
+def test_after_fifteen_minutes_without_the_ai_a_flagged_card_is_opened(
+    database, admin_conn, channel
+):
+    message = say(admin_conn, channel, database, "Preciso da guia xyzespera2", who=phone())
+    admin_conn.execute(
+        "UPDATE messages SET provider_timestamp = now() - interval '20 minutes' WHERE id = %s",
+        (message,),
+    )
+
+    counts = run(database, channel.tenant_id, FakeCaseLLM(error=ClassifierUnavailable("fora")))
+
+    ((_, _, _, _, _, _, _, review, reason),) = demands_of(
+        admin_conn, channel.tenant_id, "xyzespera2"
+    )
+    assert counts["fallback"] == 1
+    assert review is True and "triagem" in reason
+
+
+def test_the_daily_cap_also_waits_before_falling_back(database, admin_conn, channel):
+    message = say(admin_conn, channel, database, "Pedido xyzespera3", who=phone())
+    fresh(admin_conn, message)
+
+    counts = run(database, channel.tenant_id, FakeCaseLLM(decision()), daily_cap=0)
+
+    assert counts["deferred"] == 1
+    assert demands_of(admin_conn, channel.tenant_id, "xyzespera3") == []

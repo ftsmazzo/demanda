@@ -62,6 +62,7 @@ def board(
     sector: Sector | None = None,
     assignee: str | None = None,
     priority: bool | None = None,
+    meetings: bool = False,
     closed_days: Annotated[int, Query(ge=1, le=365)] = 14,
 ) -> Board:
     where, params = filters(
@@ -69,6 +70,9 @@ def board(
     )
     recent = "(d.status <> 'concluido' OR d.closed_at >= now() - make_interval(days => %s))"
     base = f"{where} AND {recent}"
+    if not meetings:
+        # compromissos vivem na Agenda; o quadro e para tarefas
+        base += " AND d.kind <> 'compromisso'"
     base_params = [*params, closed_days]
     columns = []
     with db.tenant_transaction(user.tenant_id) as conn:

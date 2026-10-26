@@ -8,7 +8,7 @@ separado marcado para revisao. Contas de data e fuso sao feitas aqui, nunca pela
 import logging
 from collections import Counter
 from dataclasses import replace
-from datetime import date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 from uuid import UUID
 from zoneinfo import ZoneInfo
@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 CONFIDENCE_MIN = 0.6  # abaixo disso a IA nao altera nada que ja existe
 UPDATE_MIN = 0.8  # abaixo disso uma remarcacao vira so proposta
 DEFAULT_DAILY_CAP = 400
+TRIAGE_WAIT = timedelta(minutes=15)  # tempo que uma mensagem espera pela IA antes das regras
 MAX_OPEN_CASES = 5
 MAX_APPOINTMENTS = 8
 RECENT_PER_CASE = 3
@@ -88,6 +89,8 @@ def _event(
 
 def _reserve_call(conn: psycopg.Connection, tenant_id: UUID, day: date, cap: int) -> bool:
     """Conta uma chamada de IA no dia. Falso quando o teto do dia ja foi atingido."""
+    if cap <= 0:
+        return False
     row = conn.execute(
         "INSERT INTO ai_usage (tenant_id, day, purpose, calls) VALUES (%s, %s, 'case', 1) "
         "ON CONFLICT (tenant_id, day, purpose) DO UPDATE SET calls = ai_usage.calls + 1 "
@@ -310,7 +313,23 @@ def _apply(conn, tenant_id, row, d: CaseDecision, ctx, case_ids, appointment_ids
 
 def _rules(db: Database, tenant_id: UUID, row: tuple[Any, ...]) -> str:
     with db.tenant_transaction(tenant_id) as conn:
-        return _materialize_one(conn, tenant_id, row[:8])
+        outcome = _materialize_one(conn, tenant_id, row[:8])
+        conn.execute(
+            "UPDATE demands SET needs_review = true, review_reason = 'aberto sem a triagem da IA' "
+            "WHERE needs_review = false AND id IN "
+            "(SELECT demand_id FROM demand_messages WHERE message_id = %s)",
+            (row[0],),
+        )
+        return outcome
+
+
+def _without_ai(db: Database, tenant_id: UUID, row: tuple[Any, ...]) -> list[str]:
+    """A IA nao pode responder agora: a mensagem espera na triagem; so passado o prazo as regras
+    abrem um item, marcado para confirmacao."""
+    if datetime.now(UTC) - row[3] < TRIAGE_WAIT:
+        return ["deferred"]
+    _rules(db, tenant_id, row)
+    return ["fallback"]
 
 
 def _prepare(db: Database, tenant_id: UUID, row, daily_cap: int):
@@ -332,15 +351,13 @@ def _process(db: Database, tenant_id: UUID, llm: CaseLLM, row, daily_cap: int) -
     if prepared == "already":
         return ["already"]
     if prepared is None:
-        _rules(db, tenant_id, row)
-        return ["fallback"]
+        return _without_ai(db, tenant_id, row)
     ctx, case_ids, appointment_ids = prepared
     try:
         decision = llm.analyze(text or "", ctx)
     except Exception as exc:
-        logger.warning("IA de caso falhou (%s): usando regras", type(exc).__name__)
-        _rules(db, tenant_id, row)
-        return ["fallback"]
+        logger.warning("IA de caso falhou (%s: %s)", type(exc).__name__, str(exc)[:200])
+        return _without_ai(db, tenant_id, row)
 
     with db.tenant_transaction(tenant_id) as conn:
         conn.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (str(contact_id),))

@@ -32,6 +32,8 @@ _STATUS_LABEL = {
 
 
 def _reserve(conn: psycopg.Connection, tenant_id: UUID, day: date, cap: int) -> bool:
+    if cap <= 0:
+        return False
     row = conn.execute(
         "INSERT INTO ai_usage (tenant_id, day, purpose, calls) VALUES (%s, %s, 'agent', 1) "
         "ON CONFLICT (tenant_id, day, purpose) DO UPDATE SET calls = ai_usage.calls + 1 "
