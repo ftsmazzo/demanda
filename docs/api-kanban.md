@@ -109,6 +109,16 @@ A demanda e o **caso**: alem do titulo, tem `summary` (resumo escrito pela IA), 
 
 O ciclo do worker usa a IA de caso quando ha chave (`OPENROUTER_API_KEY` ou `ANTHROPIC_API_KEY`) e `CASE_LLM` nao e `off`. Para cada mensagem a IA recebe so o contato, os casos abertos dele e os compromissos, e decide anexar, abrir um caso novo ou ignorar. O codigo faz as contas de data. Confianca abaixo de 0,6 nunca altera o que existe: abre um caso separado marcado "confirmar agrupamento"; remarcacao abaixo de 0,8 vira so uma proposta (aplicavel na gaveta do caso). Falha da IA, resposta fora do contrato ou teto diario (`CASE_DAILY_CAP`) voltam ao agrupamento por regras.
 
+## Cadastrar uma empresa nova
+
+Um comando faz tudo, no console da api. Precisa de `EVOLUTION_URL`, `EVOLUTION_API_KEY` e `AGENT_APP_URL` (ou `APP_URL`) no ambiente. A senha do socio vem de `USER_PASSWORD`; se faltar, o comando gera uma e mostra uma unica vez.
+
+```bash
+python -m app.cli onboard-tenant --slug ecommtabil --name "Ecommtabil" --instance NOME_DA_INSTANCIA --owner-name "Nome do socio" --owner-email email@dominio.com --owner-phone 5511999990101
+```
+
+Ele cria a empresa, o canal ligado a instancia, o socio e o destinatario do agente (o telefone recebe os avisos), gira o segredo do canal e configura o webhook na Evolution pela API (o painel do Manager nao aceita o cabecalho). A Evolution e conferida antes de o segredo novo ir para o banco. Se ela recusar, a empresa ja existe e o comando diz como concluir: `python -m app.cli setup-channel-webhook --tenant-slug SLUG` (serve tambem para refazer o webhook de qualquer empresa; com mais de um canal, use `--instance`). Depois, conecte a instancia no Evolution Manager (o comando avisa se ela nao estiver conectada) e confira com `python -m app.cli stats`.
+
 ## Limitacoes conhecidas
 
 - A interface web (`frontend/`) e servida pela propria API a partir de `STATIC_DIR` (a imagem Docker ja a embute em `/app/static`). Mesma origem, sem CORS.

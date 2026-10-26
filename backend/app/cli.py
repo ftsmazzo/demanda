@@ -18,6 +18,7 @@ from app.core.appointments import _tenant_zone, backfill_appointments
 from app.core.demands import materialize_demands
 from app.db import Database
 from app.evolution_client import EvolutionClient, EvolutionError
+from app.onboarding import OnboardingError, onboard_tenant, rotate_and_set_webhook
 from app.provisioning import create_channel, create_runtime_role, create_tenant, create_user
 from app.security.tokens import ROLES
 
@@ -99,6 +100,24 @@ def _build_parser() -> argparse.ArgumentParser:
         "agent-retry", help="recoloca na fila os avisos das ultimas 24 h que foram pulados"
     )
     retry.add_argument("--tenant-slug", required=True)
+
+    onboard = sub.add_parser(
+        "onboard-tenant",
+        help="cadastra uma empresa nova: canal, webhook, socio e agente (senha em USER_PASSWORD)",
+    )
+    onboard.add_argument("--slug", required=True)
+    onboard.add_argument("--name", required=True)
+    onboard.add_argument("--instance", required=True, help="instancia da Evolution que escuta")
+    onboard.add_argument("--owner-name", required=True)
+    onboard.add_argument("--owner-email", required=True)
+    onboard.add_argument("--owner-phone", required=True, help="recebe os avisos do agente")
+
+    channel_hook = sub.add_parser(
+        "setup-channel-webhook",
+        help="gira o segredo do canal e liga o webhook na Evolution (conclui ou refaz o cadastro)",
+    )
+    channel_hook.add_argument("--tenant-slug", required=True)
+    channel_hook.add_argument("--instance", help="so se a empresa tiver mais de um canal")
 
     sub.add_parser("stats", help="contagem de mensagens e latencia por canal (medicao do spike)")
 
@@ -490,6 +509,91 @@ def _agent_retry(conn: psycopg.Connection, args: argparse.Namespace) -> int:
     return 0
 
 
+def _app_url() -> str | None:
+    return os.environ.get("APP_URL") or os.environ.get("AGENT_APP_URL")
+
+
+def _onboard_tenant(conn: psycopg.Connection, args: argparse.Namespace) -> int:
+    app_url = _app_url()
+    missing = [n for n in ("EVOLUTION_URL", "EVOLUTION_API_KEY") if not os.environ.get(n)]
+    if missing or not app_url:
+        needed = missing + ([] if app_url else ["AGENT_APP_URL"])
+        print("faltam variaveis no ambiente da api: " + ", ".join(needed), file=sys.stderr)
+        return 2
+    client = _evolution_from_env()
+    state = client.connection_state(args.instance)
+    try:
+        result = onboard_tenant(
+            conn,
+            client,
+            slug=args.slug,
+            name=args.name,
+            instance=args.instance,
+            owner_name=args.owner_name,
+            owner_email=args.owner_email,
+            owner_phone=args.owner_phone,
+            password=os.environ.get("USER_PASSWORD") or None,
+            app_url=app_url,
+        )
+    except OnboardingError as exc:
+        print(f"erro: {exc}", file=sys.stderr)
+        return 1 if "ja existe" in str(exc) else 2
+    except psycopg.errors.UniqueViolation:
+        print("ja existe um registro igual (e-mail, instancia ou telefone)", file=sys.stderr)
+        return 1
+    except EvolutionError as exc:
+        print(f"a empresa foi criada, mas a Evolution recusou o webhook: {exc}", file=sys.stderr)
+        print(
+            "Conserte a Evolution e conclua com: "
+            f"python -m app.cli setup-channel-webhook --tenant-slug {args.slug}",
+            file=sys.stderr,
+        )
+        return 1
+    print(f"empresa cadastrada: {args.name} ({args.slug})")
+    print(f"  canal ligado a instancia {args.instance} (estado agora: {state})")
+    print(f"  webhook: {result.webhook_url}")
+    tail = args.owner_phone[-4:]
+    print(f"  socio: {args.owner_name} <{args.owner_email}>; avisos do agente em ...{tail}")
+    if result.owner_password:
+        print(f"  senha inicial: {result.owner_password}")
+        print("  (anote agora: ela nao sera exibida de novo; troque depois do primeiro acesso)")
+    if state != "open":
+        print("  ATENCAO: a instancia nao esta conectada; conecte-a no Evolution Manager.")
+    return 0
+
+
+def _setup_channel_webhook(conn: psycopg.Connection, args: argparse.Namespace) -> int:
+    app_url = _app_url()
+    if not (os.environ.get("EVOLUTION_URL") and os.environ.get("EVOLUTION_API_KEY") and app_url):
+        print(
+            "faltam EVOLUTION_URL, EVOLUTION_API_KEY ou AGENT_APP_URL no ambiente", file=sys.stderr
+        )
+        return 2
+    tenant_id = _tenant_id(conn, args.tenant_slug)
+    if tenant_id is None:
+        return 1
+    channels = conn.execute(
+        "SELECT id, instance_name FROM channels WHERE tenant_id = %s AND active "
+        "AND (%s::text IS NULL OR instance_name = %s) ORDER BY created_at",
+        (tenant_id, args.instance, args.instance),
+    ).fetchall()
+    if len(channels) != 1:
+        print("informe --instance: a empresa tem zero ou mais de um canal ativo", file=sys.stderr)
+        return 2
+    channel_id, instance = channels[0]
+    try:
+        url = rotate_and_set_webhook(
+            conn, _evolution_from_env(), channel_id=channel_id, instance=instance, app_url=app_url
+        )
+    except EvolutionError as exc:
+        print(f"a Evolution recusou: {exc}. O segredo antigo continua valendo.", file=sys.stderr)
+        return 1
+    print(f"webhook configurado na instancia {instance}")
+    print(f"  url: {url}")
+    print("  segredo novo gravado (valor nao exibido)")
+    return 0
+
+
 def _read_password() -> str | None:
     password = os.environ.get("USER_PASSWORD")
     if password:
@@ -569,6 +673,12 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "recipients":
             return _list_recipients(conn, args)
+
+        if args.command == "onboard-tenant":
+            return _onboard_tenant(conn, args)
+
+        if args.command == "setup-channel-webhook":
+            return _setup_channel_webhook(conn, args)
 
         if args.command == "agent-retry":
             return _agent_retry(conn, args)
