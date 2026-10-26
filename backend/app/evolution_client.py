@@ -37,11 +37,17 @@ class EvolutionClient:
         self._key = api_key
         self._transport = transport or _urllib_transport
 
-    def _call(self, method: str, path: str, payload: dict[str, Any] | None = None) -> Any:
+    def _call(
+        self,
+        method: str,
+        path: str,
+        payload: dict[str, Any] | None = None,
+        ok: tuple[int, ...] = (200,),
+    ) -> Any:
         headers = {"apikey": self._key, "Content-Type": "application/json"}
         body = json.dumps(payload).encode() if payload is not None else None
         status, data = self._transport(method, f"{self._base}{path}", headers, body)
-        if status != 200:
+        if status not in ok:
             raise EvolutionError(f"Evolution respondeu HTTP {status}")
         return data
 
@@ -81,3 +87,17 @@ class EvolutionClient:
         if not isinstance(block, dict) or not isinstance(block.get("records"), list):
             raise EvolutionError("resposta inesperada da Evolution")
         return block["records"], int(block.get("pages") or 1)
+
+    def send_text(self, instance: str, number: str, text: str) -> None:
+        """Envia um texto pela instancia do agente (POST /message/sendText/{instancia})."""
+        if not _INSTANCE.match(instance):
+            raise EvolutionError("nome de instancia invalido")
+        try:
+            self._call(
+                "POST",
+                f"/message/sendText/{quote(instance)}",
+                {"number": number, "text": text},
+                ok=(200, 201),
+            )
+        except (OSError, ValueError) as exc:
+            raise EvolutionError("falha de rede ao falar com a Evolution") from exc

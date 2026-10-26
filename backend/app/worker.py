@@ -4,7 +4,10 @@ import logging
 import threading
 from collections import Counter
 from collections.abc import Callable
+from datetime import UTC, datetime
 
+from app.agent.runner import run_tenant
+from app.agent.sender import MessageSender
 from app.channel_health import EvolutionLike, check_channels
 from app.classification.llm import LLMClassifier
 from app.classification.store import classify_pending
@@ -82,3 +85,33 @@ class HealthMonitor(BackgroundWorker):
 
     def cycle(self) -> Counter[str]:
         return check_channels(self._db, self._evolution)
+
+
+class AgentWorker(BackgroundWorker):
+    """Avisa os socios pelo WhatsApp: compromisso novo, resumo do dia e demandas paradas."""
+
+    def __init__(
+        self,
+        db: Database,
+        sender: MessageSender,
+        *,
+        app_url: str,
+        interval_seconds: float,
+    ) -> None:
+        super().__init__(db, None, interval_seconds=interval_seconds)
+        self.name = "demanda-agent"
+        self._sender = sender
+        self._app_url = app_url
+
+    def cycle(self) -> Counter[str]:
+        total: Counter[str] = Counter()
+        now = datetime.now(UTC)
+        for tenant_id in self._db.tenant_ids():
+            try:
+                total.update(
+                    run_tenant(self._db, tenant_id, self._sender, app_url=self._app_url, now=now)
+                )
+            except Exception:
+                total["tenant_errors"] += 1
+                logger.exception("falha no agente do tenant %s", tenant_id)
+        return total

@@ -3,6 +3,7 @@
 import argparse
 import getpass
 import os
+import re
 import sys
 
 import psycopg
@@ -61,6 +62,23 @@ def _build_parser() -> argparse.ArgumentParser:
         "backfill-appointments",
         help="propoe compromissos para reunioes que ja viraram demanda",
     )
+
+    add = sub.add_parser("add-recipient", help="cadastra um socio para receber os avisos do agente")
+    add.add_argument("--tenant-slug", required=True)
+    add.add_argument("--name", required=True)
+    add.add_argument("--phone", required=True, help="com DDI e DDD, ex.: 5511999990101")
+    add.add_argument("--user-email", help="e-mail do usuario socio ligado a este telefone")
+
+    remove = sub.add_parser("remove-recipient", help="desativa um destinatario do agente")
+    remove.add_argument("--tenant-slug", required=True)
+    remove.add_argument("--phone", required=True)
+
+    listing = sub.add_parser("recipients", help="lista quem recebe os avisos do agente")
+    listing.add_argument("--tenant-slug", required=True)
+
+    outbox = sub.add_parser("agent-outbox", help="ultimos avisos do agente e o estado de cada um")
+    outbox.add_argument("--tenant-slug")
+    outbox.add_argument("--limit", type=_review_limit, default=15, help="quantidade (1 a 200)")
 
     sub.add_parser("stats", help="contagem de mensagens e latencia por canal (medicao do spike)")
 
@@ -229,6 +247,96 @@ def _backfill_appointments(conn: psycopg.Connection) -> int:
     return 0
 
 
+def _tenant_id(conn: psycopg.Connection, slug: str):
+    row = conn.execute("SELECT id FROM tenants WHERE slug = %s", (slug,)).fetchone()
+    if row is None:
+        print(f"tenant nao encontrado: {slug}", file=sys.stderr)
+        return None
+    return row[0]
+
+
+def _add_recipient(conn: psycopg.Connection, args: argparse.Namespace) -> int:
+    tenant_id = _tenant_id(conn, args.tenant_slug)
+    if tenant_id is None:
+        return 1
+    phone = re.sub(r"\D", "", args.phone)
+    if not 10 <= len(phone) <= 15:
+        print("telefone invalido: use DDI e DDD, so numeros (ex.: 5511999990101)", file=sys.stderr)
+        return 2
+    user_id = None
+    if args.user_email:
+        row = conn.execute(
+            "SELECT id, role FROM users WHERE tenant_id = %s AND lower(email) = lower(%s)",
+            (tenant_id, args.user_email),
+        ).fetchone()
+        if row is None:
+            print("usuario nao encontrado neste tenant", file=sys.stderr)
+            return 1
+        if row[1] != "socio":
+            print("o agente so fala com socio: o usuario informado nao e socio", file=sys.stderr)
+            return 2
+        user_id = row[0]
+    try:
+        conn.execute(
+            "INSERT INTO agent_recipients (tenant_id, user_id, name, phone) "
+            "VALUES (%s, %s, %s, %s)",
+            (tenant_id, user_id, args.name.strip(), phone),
+        )
+    except psycopg.errors.UniqueViolation:
+        print("telefone ja cadastrado neste tenant", file=sys.stderr)
+        return 1
+    print(f"destinatario cadastrado: {args.name.strip()} (...{phone[-4:]})")
+    return 0
+
+
+def _remove_recipient(conn: psycopg.Connection, args: argparse.Namespace) -> int:
+    tenant_id = _tenant_id(conn, args.tenant_slug)
+    if tenant_id is None:
+        return 1
+    phone = re.sub(r"\D", "", args.phone)
+    done = conn.execute(
+        "UPDATE agent_recipients SET active = false WHERE tenant_id = %s AND phone = %s",
+        (tenant_id, phone),
+    )
+    print("destinatario desativado" if done.rowcount else "destinatario nao encontrado")
+    return 0 if done.rowcount else 1
+
+
+def _list_recipients(conn: psycopg.Connection, args: argparse.Namespace) -> int:
+    tenant_id = _tenant_id(conn, args.tenant_slug)
+    if tenant_id is None:
+        return 1
+    rows = conn.execute(
+        "SELECT name, phone, active FROM agent_recipients WHERE tenant_id = %s ORDER BY created_at",
+        (tenant_id,),
+    ).fetchall()
+    for name, phone, active in rows:
+        print(f"{name} ...{phone[-4:]} {'ativo' if active else 'desativado'}")
+    if not rows:
+        print("nenhum destinatario")
+    return 0
+
+
+def _agent_outbox(conn: psycopg.Connection, args: argparse.Namespace) -> int:
+    tenant_id = _tenant_id(conn, args.tenant_slug) if args.tenant_slug else None
+    if args.tenant_slug and tenant_id is None:
+        return 1
+    rows = conn.execute(
+        "SELECT n.created_at, r.name, n.kind, n.status, n.attempts, n.body "
+        "FROM agent_notifications n JOIN agent_recipients r ON r.id = n.recipient_id "
+        "WHERE (%s::uuid IS NULL OR n.tenant_id = %s::uuid) "
+        "ORDER BY n.created_at DESC, n.id LIMIT %s",
+        (tenant_id, tenant_id, args.limit),
+    ).fetchall()
+    for created, name, kind, status, attempts, body in rows:
+        print(f"{created:%Y-%m-%d %H:%M} | {name} | {kind} | {status} ({attempts}x)")
+        if body:
+            print("    " + body.replace(chr(10), chr(10) + "    "))
+    if not rows:
+        print("caixa de saida vazia")
+    return 0
+
+
 def _read_password() -> str | None:
     password = os.environ.get("USER_PASSWORD")
     if password:
@@ -297,6 +405,18 @@ def main(argv: list[str] | None = None) -> int:
             return _print_demands(
                 conn, args.limit, only_open=args.open, tenant_slug=args.tenant_slug
             )
+
+        if args.command == "add-recipient":
+            return _add_recipient(conn, args)
+
+        if args.command == "remove-recipient":
+            return _remove_recipient(conn, args)
+
+        if args.command == "recipients":
+            return _list_recipients(conn, args)
+
+        if args.command == "agent-outbox":
+            return _agent_outbox(conn, args)
 
         if args.command == "backfill-appointments":
             return _backfill_appointments(conn)

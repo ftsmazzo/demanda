@@ -102,3 +102,32 @@ def test_the_app_runs_the_worker_while_it_is_up(admin_url, admin_conn, channel):
             threading.Event().wait(0.05)
 
     assert found == 1
+
+
+def test_the_agent_worker_runs_every_tenant_and_survives_one_failing(
+    database, channel, other_channel, monkeypatch
+):
+    from collections import Counter
+
+    from app import worker as worker_module
+    from app.worker import AgentWorker
+
+    seen = []
+
+    def fake_run_tenant(db, tenant_id, sender, *, app_url, now):
+        seen.append((tenant_id, sender, app_url))
+        if tenant_id == channel.tenant_id:
+            raise RuntimeError("falha de teste")
+        return Counter(sent=1)
+
+    monkeypatch.setattr(worker_module, "run_tenant", fake_run_tenant)
+    sender = object()
+    agent = AgentWorker(database, sender, app_url="https://x.example", interval_seconds=60)
+
+    summary = agent.cycle()
+
+    tenants = {tenant for tenant, _, _ in seen}
+    assert {channel.tenant_id, other_channel.tenant_id} <= tenants
+    assert all(s is sender and url == "https://x.example" for _, s, url in seen)
+    assert summary["tenant_errors"] >= 1
+    assert summary["sent"] >= 1

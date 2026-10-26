@@ -57,3 +57,4 @@ uvicorn app.main:app --reload
 - Runtime deve usar `APP_DATABASE_URL` (login `demanda_runtime`, sem privilegios). `DATABASE_URL` (dono do schema) so para migrations e CLI; nunca usar o dono em runtime.
 - Sem rate limit no webhook (a cargo do proxy) e sem rotacao de segredo de canal.
 - Toda migration nova precisa dar GRANT ao papel `demanda_app` nas tabelas que criar.
+- O agente envia WhatsApp: manter `AGENT_SEND` desligado (ensaio) ate o responsavel conferir a caixa de saida; usar numero proprio da plataforma, nunca o do escritorio; so socios cadastrados recebem.

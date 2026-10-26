@@ -9,6 +9,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from psycopg_pool import PoolTimeout
 
+from app.agent.sender import MessageSender, build_sender
 from app.api.appointments import router as appointments_router
 from app.api.auth import router as auth_router
 from app.api.channels import router as channels_router
@@ -27,7 +28,7 @@ from app.provisioning import create_runtime_role
 from app.security.throttle import LoginThrottle
 from app.spa import add_security_headers, mount_spa
 from app.webhooks import router as webhooks_router
-from app.worker import BackgroundWorker, HealthMonitor
+from app.worker import AgentWorker, BackgroundWorker, HealthMonitor
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,9 @@ def create_app(
     classifier: LLMClassifier | None = None,
     evolution: EvolutionLike | None = None,
     health_interval_seconds: float = 60,
+    agent_sender: MessageSender | None = None,
+    agent_app_url: str = "",
+    agent_interval_seconds: float = 60,
 ) -> FastAPI:
     """database_url: conexao de runtime. admin_url: dono do schema, so para migrations."""
     db = Database(database_url, app_role=app_role, max_size=pool_max) if database_url else None
@@ -72,6 +76,15 @@ def create_app(
             )
         if db is not None and evolution is not None:
             workers.append(HealthMonitor(db, evolution, interval_seconds=health_interval_seconds))
+        if db is not None and agent_sender is not None:
+            workers.append(
+                AgentWorker(
+                    db,
+                    agent_sender,
+                    app_url=agent_app_url,
+                    interval_seconds=agent_interval_seconds,
+                )
+            )
         for worker in workers:
             worker.start()
         try:
@@ -127,6 +140,9 @@ _evolution = (
     if os.environ.get("EVOLUTION_URL") and os.environ.get("EVOLUTION_API_KEY")
     else None
 )
+_agent_sender = build_sender(os.environ, _evolution)
+if _agent_sender is not None:
+    logger.warning("agente dos socios ligado em modo %s", _agent_sender.mode)
 _worker_interval = float(os.environ.get("WORKER_INTERVAL_SECONDS", "0"))
 _classifier, _classifier_note = build_classifier(os.environ) if _worker_interval else (None, "")
 if _worker_interval:
@@ -145,5 +161,7 @@ app = create_app(
     worker_interval_seconds=_worker_interval or None,
     classifier=_classifier,
     evolution=_evolution,
+    agent_sender=_agent_sender,
+    agent_app_url=os.environ.get("AGENT_APP_URL", ""),
     health_interval_seconds=float(os.environ.get("HEALTH_INTERVAL_SECONDS", "60")),
 )

@@ -82,6 +82,18 @@ Com `WORKER_INTERVAL_SECONDS` (por exemplo `30`) a propria API roda um ciclo em 
 
 Com `EVOLUTION_URL` e `EVOLUTION_API_KEY` (e, opcionalmente, `HEALTH_INTERVAL_SECONDS`, padrao 60) a API consulta `GET /instance/connectionState/{instancia}` de cada canal e grava o estado em `channels.health_state`. Estando `open`, busca em `POST /chat/findMessages/{instancia}` as mensagens da janela desde a ultima reconciliacao (menos 10 min de folga; 24 h na primeira vez; no maximo 72 h) e grava as que o webhook nao entregou, sem duplicar. Quando o estado deixa de ser `open`, o log registra erro e a interface mostra um aviso aos socios e gestores (`GET /api/v1/channels/health`). A chave nunca vai ao navegador.
 
+## Agente dos socios
+
+Liga com `AGENT_INSTANCE` (instancia da Evolution com o numero da plataforma, diferente da instancia que escuta o escritorio), alem de `EVOLUTION_URL` e `EVOLUTION_API_KEY`. Fala so com os destinatarios cadastrados (`add-recipient`, que aceita apenas socio como usuario ligado). Tres avisos, todos de segunda a sexta quando indicado e so entre 07h e 21h na hora do escritorio:
+
+- compromisso novo proposto (nas ultimas 24 h), com link para a Agenda;
+- resumo do dia a partir das 18h: novas, concluidas, abertas, criticas, as mais paradas e os compromissos de amanha;
+- demandas paradas ha 72 h ou mais, a partir das 9h (so quando ha alguma).
+
+Os numeros vem de consultas SQL e o texto e montado por modelos: a IA nao escreve nada que va ao socio. Cada aviso tem chave de idempotencia por pessoa (`agent_notifications`), tenta ate 3 vezes (espera de 5 min) e no maximo 12 por pessoa em 24 h.
+
+Sem `AGENT_SEND=1` o agente trabalha em **ensaio**: grava o texto e marca `dry_run`, sem enviar. Veja o que ele diria com `python -m app.cli agent-outbox --tenant-slug SLUG`. Cadastro: `add-recipient --tenant-slug SLUG --name NOME --phone 5511999990101 [--user-email EMAIL]`, `recipients`, `remove-recipient`.
+
 ## Limitacoes conhecidas
 
 - A interface web (`frontend/`) e servida pela propria API a partir de `STATIC_DIR` (a imagem Docker ja a embute em `/app/static`). Mesma origem, sem CORS.
