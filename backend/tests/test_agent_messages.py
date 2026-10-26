@@ -81,3 +81,15 @@ def test_the_stuck_alert_lists_the_longest_waiting_first_with_how_long():
     assert text.index("A") < text.index("B")
     assert "4 dias" in text and "3 dias" in text
     assert f"{URL}/" in text
+
+
+def test_an_unsorted_sector_is_not_shown_to_the_owner():
+    info = AppointmentInfo(
+        "Reuniao", datetime(2026, 10, 28, 14, 0, tzinfo=SP), False, "Poli", "Triagem"
+    )
+
+    text = appointment_text(info, URL)
+
+    assert "Triagem" not in text
+    assert "quarta-feira, 28/10 às 14:00" in text
+    assert "(" not in text.splitlines()[2]

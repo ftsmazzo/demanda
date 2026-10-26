@@ -60,13 +60,14 @@ def _plural(count: int, one: str, many: str) -> str:
 def appointment_text(info: AppointmentInfo, app_url: str) -> str:
     when = _day(info.starts_at.date())
     when += " o dia todo" if info.all_day else f" às {info.starts_at:%H:%M}"
+    sector = "" if info.sector == "Triagem" else f" ({info.sector})"
     who = (
         f"{info.contact_name} falou de um compromisso" if info.contact_name else "Novo compromisso"
     )
     return (
         f"*{who}*\n"
         f"{info.title}\n"
-        f"Quando: {when} ({info.sector})\n\n"
+        f"Quando: {when}{sector}\n\n"
         f"Confirme ou cancele na Agenda: {app_url.rstrip('/')}/agenda"
     )
 
