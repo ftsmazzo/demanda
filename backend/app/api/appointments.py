@@ -18,7 +18,7 @@ DbDep = Annotated[Database, Depends(get_db)]
 
 _SELECT = """
     SELECT a.id, a.title, a.starts_at, a.all_day, a.status, a.demand_id, d.sector,
-           c.id, c.name, c.phone, c.kind
+           c.id, c.name, c.phone, c.kind, c.priority
     FROM appointments a
     JOIN demands d ON d.id = a.demand_id
     LEFT JOIN contacts c ON c.id = a.contact_id
@@ -27,7 +27,11 @@ _EDITABLE = {"title": "title", "starts_at": "starts_at", "all_day": "all_day", "
 
 
 def _out(row: tuple) -> AppointmentOut:
-    contact = ContactRef(id=row[7], name=row[8], phone=row[9], kind=row[10]) if row[7] else None
+    contact = (
+        ContactRef(id=row[7], name=row[8], phone=row[9], kind=row[10], priority=row[11])
+        if row[7]
+        else None
+    )
     return AppointmentOut(
         id=row[0],
         title=row[1],

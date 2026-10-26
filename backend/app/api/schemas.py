@@ -32,6 +32,7 @@ class ContactRef(BaseModel):
     name: str | None
     phone: str
     kind: str
+    priority: bool = False
 
 
 class Progress(BaseModel):
@@ -191,10 +192,11 @@ class SubtaskPatch(_AtLeastOneField):
 
 
 class ContactPatch(_AtLeastOneField):
-    not_nullable: ClassVar[tuple[str, ...]] = ("name", "kind")
+    not_nullable: ClassVar[tuple[str, ...]] = ("name", "kind", "priority")
 
     name: PersonName | None = None
     kind: ContactKind | None = None
+    priority: bool | None = None
 
 
 class UserOut(BaseModel):

@@ -64,6 +64,12 @@ _TOUCH = """
 """
 
 
+def lift_for_priority(conn: psycopg.Connection, contact_id: UUID | None, urgency: str) -> str:
+    """Cliente prioritario nunca fica abaixo de "alta"."""
+    row = conn.execute("SELECT priority FROM contacts WHERE id = %s", (contact_id,)).fetchone()
+    return max_urgency(urgency, "alta") if row and row[0] else urgency
+
+
 def make_title(text: str | None) -> str:
     cleaned = " ".join((text or "").split())
     if not cleaned:
@@ -99,6 +105,7 @@ def materialize_demands(db: Database, tenant_id: UUID, *, limit: int = 200) -> C
 
 def _materialize_one(conn: psycopg.Connection, tenant_id: UUID, row: tuple[Any, ...]) -> str:
     message_id, contact_id, text, sent_at, action, sector, kind, urgency = row
+    urgency = lift_for_priority(conn, contact_id, urgency)
 
     # uma execucao por contato de cada vez: evita demandas duplicadas quando ha concorrencia
     conn.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (str(contact_id),))

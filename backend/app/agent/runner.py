@@ -107,13 +107,16 @@ def stuck_items(
     conn: psycopg.Connection, now: datetime, minimum: int, limit: int
 ) -> list[StuckItem]:
     rows = conn.execute(
-        f"SELECT d.title, d.sector, {_IDLE} AS idle FROM demands d "
+        f"SELECT d.title, d.sector, {_IDLE} AS idle, COALESCE(c.priority, false) "
+        "FROM demands d LEFT JOIN contacts c ON c.id = d.contact_id "
         "WHERE d.status <> 'concluido' AND "
-        f"{_IDLE} >= %s ORDER BY idle DESC, d.id LIMIT %s",
-        (now, now, minimum, limit),
+        f"{_IDLE} >= CASE WHEN COALESCE(c.priority, false) THEN LEAST(%s, 24) ELSE %s END "
+        "ORDER BY idle DESC, d.id LIMIT %s",
+        (now, now, minimum, minimum, limit),
     ).fetchall()
     return [
-        StuckItem(title, SECTOR_LABEL.get(sector, sector), idle) for title, sector, idle in rows
+        StuckItem(title, SECTOR_LABEL.get(sector, sector), idle, vip)
+        for title, sector, idle, vip in rows
     ]
 
 

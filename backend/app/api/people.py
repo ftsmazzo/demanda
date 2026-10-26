@@ -62,12 +62,12 @@ def list_contacts(
         params.extend([pattern, pattern])
     with db.tenant_transaction(user.tenant_id) as conn:
         rows = conn.execute(
-            "SELECT id, name, phone, kind FROM contacts WHERE "
+            "SELECT id, name, phone, kind, priority FROM contacts WHERE "
             + " AND ".join(where)
             + " ORDER BY updated_at DESC, id LIMIT %s OFFSET %s",
             [*params, limit, offset],
         ).fetchall()
-    return [ContactRef(id=r[0], name=r[1], phone=r[2], kind=r[3]) for r in rows]
+    return [ContactRef(id=r[0], name=r[1], phone=r[2], kind=r[3], priority=r[4]) for r in rows]
 
 
 @router.patch("/contacts/{contact_id}")
@@ -82,16 +82,20 @@ def patch_contact(
     if "kind" in body.model_fields_set and body.kind is not None:
         sets.append("kind = %s")
         values.append(body.kind)
+    if "priority" in body.model_fields_set and body.priority is not None:
+        sets.append("priority = %s")
+        values.append(body.priority)
     if len(sets) == 1:
-        raise HTTPException(status_code=422, detail="informe nome ou tipo")
+        raise HTTPException(status_code=422, detail="informe nome, tipo ou prioridade")
     with db.tenant_transaction(user.tenant_id) as conn:
         row = conn.execute(
-            f"UPDATE contacts SET {', '.join(sets)} WHERE id = %s RETURNING id, name, phone, kind",
+            f"UPDATE contacts SET {', '.join(sets)} WHERE id = %s "
+            "RETURNING id, name, phone, kind, priority",
             [*values, contact_id],
         ).fetchone()
     if row is None:
         raise HTTPException(status_code=404, detail="contato nao encontrado")
-    return ContactRef(id=row[0], name=row[1], phone=row[2], kind=row[3])
+    return ContactRef(id=row[0], name=row[1], phone=row[2], kind=row[3], priority=row[4])
 
 
 @router.get("/users")
@@ -135,7 +139,7 @@ def contact_conversation(contact_id: UUID, user: CurrentUserDep, db: DbDep) -> C
     clause, params = visibility_clause(user)
     with db.tenant_transaction(user.tenant_id) as conn:
         row = conn.execute(
-            "SELECT id, name, phone, kind FROM contacts WHERE id = %s", (contact_id,)
+            "SELECT id, name, phone, kind, priority FROM contacts WHERE id = %s", (contact_id,)
         ).fetchone()
         # conversa com funcionario do escritorio e assunto de RH interno
         if row is None or (row[3] == "colaborador" and not can_access_hr(user)):
@@ -149,7 +153,7 @@ def contact_conversation(contact_id: UUID, user: CurrentUserDep, db: DbDep) -> C
             [contact_id, *params],
         ).fetchall()
     return Conversation(
-        contact=ContactRef(id=row[0], name=row[1], phone=row[2], kind=row[3]),
+        contact=ContactRef(id=row[0], name=row[1], phone=row[2], kind=row[3], priority=row[4]),
         cases=[row_to_card(c) for c in cases],
         messages=[
             ConversationMessage(

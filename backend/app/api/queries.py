@@ -26,7 +26,7 @@ CARD_SELECT = """
            COALESCE(st.total, 0), COALESCE(st.done, 0), COALESCE(mc.total, 0),
            CASE WHEN d.status = 'concluido' THEN 0
                 ELSE FLOOR(EXTRACT(EPOCH FROM (now() - d.last_activity_at)) / 3600)::int END,
-           d.summary, d.next_step, d.needs_review, d.review_reason
+           d.summary, d.next_step, d.needs_review, d.review_reason, COALESCE(c.priority, false)
     FROM demands d
     LEFT JOIN users u ON u.id = d.assignee_id
     LEFT JOIN contacts c ON c.id = d.contact_id
@@ -41,7 +41,7 @@ CARD_SELECT = """
 
 ORDER_BY = """
     ORDER BY CASE d.urgency WHEN 'critica' THEN 3 WHEN 'alta' THEN 2 ELSE 1 END DESC,
-             d.last_activity_at DESC, d.id
+             COALESCE(c.priority, false) DESC, d.last_activity_at DESC, d.id
 """
 
 _MESSAGES = """
@@ -92,6 +92,7 @@ def row_to_card(row: tuple[Any, ...]) -> Card:
         next_step,
         needs_review,
         review_reason,
+        priority,
     ) = row
     percent = round(100 * done / total) if total else 0
     return Card(
@@ -104,7 +105,9 @@ def row_to_card(row: tuple[Any, ...]) -> Card:
         due_date=due,
         origin=origin,
         assignee=PersonRef(id=assignee_id, name=assignee_name) if assignee_id else None,
-        contact=ContactRef(id=contact_id, name=contact_name, phone=phone, kind=contact_kind)
+        contact=ContactRef(
+            id=contact_id, name=contact_name, phone=phone, kind=contact_kind, priority=priority
+        )
         if contact_id
         else None,
         progress=Progress(done=done, total=total, percent=percent),
@@ -120,7 +123,9 @@ def row_to_card(row: tuple[Any, ...]) -> Card:
     )
 
 
-def filters(user: CurrentUser, *, status=None, sector=None, urgency=None, assignee=None):
+def filters(
+    user: CurrentUser, *, status=None, sector=None, urgency=None, assignee=None, priority=None
+):
     """WHERE + parametros: visibilidade do usuario mais os filtros opcionais."""
     clause, params = visibility_clause(user)
     parts = [clause]
@@ -133,6 +138,10 @@ def filters(user: CurrentUser, *, status=None, sector=None, urgency=None, assign
     if urgency:
         parts.append("d.urgency = %s")
         params.append(urgency)
+    if priority:
+        parts.append(
+            "EXISTS (SELECT 1 FROM contacts pc WHERE pc.id = d.contact_id AND pc.priority)"
+        )
     if assignee == "none":
         parts.append("d.assignee_id IS NULL")
     elif assignee is not None:

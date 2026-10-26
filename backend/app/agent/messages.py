@@ -28,6 +28,7 @@ class StuckItem:
     title: str
     sector: str
     idle_hours: int
+    priority: bool = False
 
 
 @dataclass(frozen=True)
@@ -43,6 +44,10 @@ class SummaryData:
 
 def _day(value: date) -> str:
     return f"{_WEEKDAYS[value.weekday()]}, {value:%d/%m}"
+
+
+def _vip(item: StuckItem) -> str:
+    return ", cliente prioritário" if item.priority else ""
 
 
 def _idle(hours: int) -> str:
@@ -92,7 +97,8 @@ def summary_text(data: SummaryData, app_url: str) -> str:
     if data.stuck:
         lines.append("\n*Mais paradas*")
         lines.extend(
-            f"- {item.title} ({item.sector}, {_idle(item.idle_hours)})" for item in data.stuck
+            f"- {item.title} ({item.sector}, {_idle(item.idle_hours)}{_vip(item)})"
+            for item in data.stuck
         )
     if data.tomorrow:
         lines.append("\n*Amanhã*")
@@ -104,7 +110,7 @@ def summary_text(data: SummaryData, app_url: str) -> str:
 def stuck_text(items: list[StuckItem], app_url: str) -> str:
     lines = ["*Demandas paradas há mais tempo*"]
     lines.extend(
-        f"{number}. {item.title} ({item.sector}, parada há {_idle(item.idle_hours)})"
+        f"{number}. {item.title} ({item.sector}, parada há {_idle(item.idle_hours)}{_vip(item)})"
         for number, item in enumerate(items, start=1)
     )
     lines.append(f"\nAbra o quadro: {app_url.rstrip('/')}/")

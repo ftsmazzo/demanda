@@ -7,6 +7,7 @@ separado marcado para revisao. Contas de data e fuso sao feitas aqui, nunca pela
 
 import logging
 from collections import Counter
+from dataclasses import replace
 from datetime import date, datetime
 from typing import Any
 from uuid import UUID
@@ -21,7 +22,7 @@ from app.cases.llm import CaseLLM
 from app.cases.prompt import AppointmentRef, CaseContext, OpenCase
 from app.classification.domain import max_urgency
 from app.core.appointments import _tenant_zone, insert_appointment
-from app.core.demands import _materialize_one, materialize_demands
+from app.core.demands import _materialize_one, lift_for_priority, materialize_demands
 from app.core.schedule import When, extract_when
 from app.db import Database
 
@@ -267,6 +268,7 @@ def _appointment(conn, tenant_id, row, demand_id, d: CaseDecision, appointment_i
 
 def _apply(conn, tenant_id, row, d: CaseDecision, ctx, case_ids, appointment_ids) -> list[str]:
     message_id, contact_id, text, sent_at = row[0], row[1], row[2], row[3]
+    d = replace(d, urgency=lift_for_priority(conn, contact_id, d.urgency))
     if d.action == "ignore":
         if d.confidence < CONFIDENCE_MIN:
             _materialize_one(conn, tenant_id, row[:8])
