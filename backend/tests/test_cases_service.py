@@ -1,5 +1,4 @@
 from app.cases.service import materialize_cases
-
 from app.classification.llm import ClassifierUnavailable
 from tests.cases_helpers import FakeCaseLLM, decision, demands_of, events_of, phone, say
 
