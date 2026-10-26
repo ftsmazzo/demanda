@@ -14,6 +14,7 @@ INTENTS = (
     "set_status",
     "mark_priority",
     "reschedule",
+    "draft_message",
     "unknown",
 )
 STATUSES = ("novo", "em_andamento", "aguardando", "concluido")
@@ -147,6 +148,7 @@ def parse_intent(data: Any) -> Intent:
         "set_status": (intent.case_text, intent.status),
         "mark_priority": (intent.contact_name, intent.priority_value),
         "reschedule": (intent.case_text, intent.due_phrase),
+        "draft_message": (intent.case_text, intent.assignee_name),
     }.get(name, ())
     if any(value is None for value in required):
         raise ValueError(f"faltam campos para {name}")

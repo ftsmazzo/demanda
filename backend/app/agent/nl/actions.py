@@ -148,7 +148,13 @@ def _reschedule(conn, tenant_id, p: dict[str, Any], app_url: str) -> str:
     return f"Pronto: {title} remarcado para {p['when_label']}."
 
 
+def _draft_message(conn, tenant_id, p: dict[str, Any], app_url: str) -> str:
+    nome = p["first_name"]
+    return f"Aprovado. Repasse a {nome} (eu não envio a ninguém fora dos sócios):\n\n{p['text']}"
+
+
 _EXECUTORS = {
+    "draft_message": _draft_message,
     "reschedule": _reschedule,
     "create_task": _create_task,
     "assign": _assign,

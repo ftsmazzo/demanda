@@ -12,4 +12,4 @@ O socio escreve para a Secretaria como falaria com uma pessoa ("o que a Ana tem 
 
 ## Intencoes
 
-`query_demands` (filtros: situacao, setor, pessoa, cliente, so prioritarios, paradas), `query_agenda` (hoje, amanha, semana), `summary`, `create_task`, `assign`, `set_status`, `mark_priority`, `reschedule` (muda o dia ou a hora de um compromisso futuro, achado pelo titulo, caso ou cliente; mostra o antes e o depois e so o `1` aplica; o historico do caso guarda a remarcacao), `unknown`.
+`query_demands` (filtros: situacao, setor, pessoa, cliente, so prioritarios, paradas), `query_agenda` (hoje, amanha, semana), `summary`, `create_task`, `assign`, `set_status`, `mark_priority`, `reschedule` (muda o dia ou a hora de um compromisso futuro, achado pelo titulo, caso ou cliente; mostra o antes e o depois e so o `1` aplica; o historico do caso guarda a remarcacao), `draft_message` (escreve o pedido a uma pessoa da equipe sobre uma demanda, por exemplo lancar as ferias; o texto e montado pelo codigo com titulo, resumo e proximo passo; o `1` do socio aprova e o agente devolve o texto para o proprio socio repassar, sem enviar a ninguem fora dos socios), `unknown`.

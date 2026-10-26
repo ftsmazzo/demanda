@@ -139,6 +139,34 @@ def _propose_status(conn, tenant_id, recipient_id, intent: Intent, now) -> str:
     return _ask(summary)
 
 
+def _draft_text(first_name: str, title: str, summary: str | None, next_step: str | None) -> str:
+    lines = [f"Oi, {first_name}! Pode cuidar disto? {title}."]
+    if summary:
+        lines.append(summary)
+    if next_step:
+        lines.append(f"Próximo passo: {next_step}")
+    lines.append("Obrigado!")
+    return "\n".join(lines)
+
+
+def _propose_draft(conn, tenant_id, recipient_id, intent: Intent, now) -> str:
+    target = _pick_demand(conn, intent)
+    if isinstance(target, str):
+        return target
+    person = _person(conn, intent.assignee_name)
+    if isinstance(person, str):
+        return person
+    title, summary, next_step = conn.execute(
+        "SELECT title, summary, next_step FROM demands WHERE id = %s", (target[0],)
+    ).fetchone()
+    first_name = person[1].split()[0]
+    text = _draft_text(first_name, title, summary, next_step)
+    summary = f"entregar o rascunho para {first_name} (sobre {title})"
+    payload = {"first_name": first_name, "text": text}
+    actions.propose(conn, tenant_id, recipient_id, "draft_message", payload, summary, now)
+    return f"Rascunho para {first_name}:\n\n{text}\n\nResponda 1 para aprovar ou 2 para cancelar."
+
+
 def _propose_priority(conn, tenant_id, recipient_id, intent: Intent, now) -> str:
     clients = find_contacts(conn, intent.contact_name or "")
     if not clients:
@@ -201,6 +229,8 @@ def _dispatch(conn, tenant_id, recipient_id, intent: Intent, zone, now, app_url)
         return _propose_status(conn, tenant_id, recipient_id, intent, now)
     if intent.intent == "mark_priority":
         return _propose_priority(conn, tenant_id, recipient_id, intent, now)
+    if intent.intent == "draft_message":
+        return _propose_draft(conn, tenant_id, recipient_id, intent, now)
     if intent.intent == "reschedule":
         return _propose_reschedule(conn, tenant_id, recipient_id, intent, zone, now)
     return unknown_text()
