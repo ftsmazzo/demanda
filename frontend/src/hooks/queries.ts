@@ -2,7 +2,12 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import type { AppointmentStatus, BoardFilters, ContactKind } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 
-export const boardKey = (filters: BoardFilters) => ["board", filters.sector ?? "", filters.assignee ?? ""];
+export const boardKey = (filters: BoardFilters) => [
+  "board",
+  filters.sector ?? "",
+  filters.assignee ?? "",
+  filters.priority ?? false,
+];
 
 export function useBoard(filters: BoardFilters) {
   const { api } = useAuth();
@@ -38,7 +43,7 @@ export function usePatchContact() {
   const { api } = useAuth();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, patch }: { id: string; patch: { name?: string; kind?: ContactKind } }) =>
+    mutationFn: ({ id, patch }: { id: string; patch: { name?: string; kind?: ContactKind; priority?: boolean } }) =>
       api.patchContact(id, patch),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["contacts"] });

@@ -119,6 +119,11 @@ python -m app.cli onboard-tenant --slug ecommtabil --name "Ecommtabil" --instanc
 
 Ele cria a empresa, o canal ligado a instancia, o socio e o destinatario do agente (o telefone recebe os avisos), gira o segredo do canal e configura o webhook na Evolution pela API (o painel do Manager nao aceita o cabecalho). A Evolution e conferida antes de o segredo novo ir para o banco. Se ela recusar, a empresa ja existe e o comando diz como concluir: `python -m app.cli setup-channel-webhook --tenant-slug SLUG` (serve tambem para refazer o webhook de qualquer empresa; com mais de um canal, use `--instance`). Depois, conecte a instancia no Evolution Manager (o comando avisa se ela nao estiver conectada) e confira com `python -m app.cli stats`.
 
+## Setor Consultoria e clientes prioritarios
+
+- **Consultoria** e um setor como os outros (`consultoria`): pareceres, planejamento, diagnosticos e analises para a empresa do cliente. Entra nas regras, nos prompts de IA, nos filtros e no cadastro de usuarios (`--sector consultoria`).
+- **Cliente prioritario** e uma marca no contato (`PATCH /api/v1/contacts/{id}` com `{"priority": true}`, socio e gestor; ou a estrela na lista de Contatos). Efeitos: a demanda nunca nasce abaixo de urgencia "alta" (regras e IA de caso); no quadro vem na frente das demais da mesma urgencia e ganha a etiqueta "Prioritario"; `GET /api/v1/board?priority=true` (e `/demands`) filtra so esses clientes (botao "So prioritarios"); o alerta de demanda parada chega com 24 h em vez de 72 h e o texto marca "cliente prioritario".
+
 ## Limitacoes conhecidas
 
 - A interface web (`frontend/`) e servida pela propria API a partir de `STATIC_DIR` (a imagem Docker ja a embute em `/app/static`). Mesma origem, sem CORS.

@@ -33,7 +33,11 @@ export function createApi(client: Client) {
     me: () => request<Me>("GET", "/api/v1/me"),
     board: (filters: BoardFilters = {}) =>
       request<Board>("GET", "/api/v1/board", undefined, {
-        query: { sector: filters.sector, assignee: filters.assignee },
+        query: {
+          sector: filters.sector,
+          assignee: filters.assignee,
+          priority: filters.priority ? "true" : undefined,
+        },
       }),
     demand: (id: string) => request<Detail>("GET", `/api/v1/demands/${safeId(id)}`),
     patchDemand: (id: string, patch: DemandPatch) =>
@@ -57,7 +61,7 @@ export function createApi(client: Client) {
     users: () => request<UserOut[]>("GET", "/api/v1/users"),
     contacts: (query: { q?: string; kind?: ContactKind | "" } = {}) =>
       request<ContactRef[]>("GET", "/api/v1/contacts", undefined, { query: { ...query, limit: 100 } }),
-    patchContact: (id: string, patch: { name?: string; kind?: ContactKind }) =>
+    patchContact: (id: string, patch: { name?: string; kind?: ContactKind; priority?: boolean }) =>
       request<ContactRef>("PATCH", `/api/v1/contacts/${safeId(id)}`, patch),
   };
 }

@@ -14,7 +14,7 @@ export function makeCard(overrides: Partial<Card> = {}): Card {
     due_date: null,
     origin: "auto",
     assignee: null,
-    contact: { id: "c-1", name: "Padaria Pão Quente", phone: "5511999990101", kind: "cliente" },
+    contact: { id: "c-1", name: "Padaria Pão Quente", phone: "5511999990101", kind: "cliente", priority: false },
     progress: { done: 0, total: 0, percent: 0 },
     messages_count: 1,
     created_at: "2026-10-20T12:00:00Z",

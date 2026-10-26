@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import type { ContactKind, ContactRef } from "../../api/types";
 import { useContacts, usePatchContact } from "../../hooks/queries";
 import { saveErrorMessage } from "../../lib/errors";
+import { Icon } from "../../components/Icon";
 import { formatPhone } from "../../lib/format";
 
 const KIND_LABEL: Record<ContactKind, string> = {
@@ -74,6 +75,23 @@ function ContactRow({ contact, onError }: { contact: ContactRef; onError: (error
           <NameEditor contact={contact} onDone={() => setEditing(false)} />
         ) : (
           <>
+            <button
+              type="button"
+              className="star-btn"
+              aria-pressed={contact.priority}
+              aria-label={
+                contact.priority ? `Tirar a prioridade de ${label}` : `Marcar ${label} como prioritário`
+              }
+              disabled={patch.isPending}
+              onClick={() =>
+                patch.mutate(
+                  { id: contact.id, patch: { priority: !contact.priority } },
+                  { onSuccess: () => onError(null), onError },
+                )
+              }
+            >
+              <Icon name="star" size={16} />
+            </button>
             <span className={contact.name ? "contact-name" : "contact-name muted"}>{contact.name ?? "Sem nome"}</span>
             <button
               type="button"

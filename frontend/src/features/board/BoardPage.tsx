@@ -30,10 +30,11 @@ export function BoardPage() {
   const [params, setParams] = useSearchParams();
   const sector = (params.get("setor") ?? "") as Sector | "";
   const person = params.get("pessoa") ?? "";
+  const onlyPriority = params.get("prioritarios") === "1";
   const selectedId = params.get("demanda");
   const manager = me.role !== "colaborador";
 
-  const board = useBoard({ sector, assignee: person });
+  const board = useBoard({ sector, assignee: person, priority: onlyPriority });
   const users = useUsers(manager);
   const move = useMoveDemand();
   const [dragging, setDragging] = useState<Card | null>(null);
@@ -119,6 +120,14 @@ export function BoardPage() {
               </option>
             ))}
           </select>
+          <button
+            type="button"
+            className="chip"
+            aria-pressed={onlyPriority}
+            onClick={() => update("prioritarios", onlyPriority ? "" : "1")}
+          >
+            Só prioritários
+          </button>
           {manager ? (
             <select
               className="select"

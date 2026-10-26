@@ -10,7 +10,7 @@ const julia = { id: "u-9", name: "Juliana Prado" };
 
 const cards = () => [
   makeCard({ id: "a", title: "Já pedi 3 vezes a certidão", urgency: "critica", sector: "societario", idle_hours: 26, assignee: julia, progress: { done: 0, total: 3, percent: 0 } }),
-  makeCard({ id: "b", title: "Quando vence o DAS?", sector: "fiscal", idle_hours: 52, contact: { id: "c-2", name: "Oficina do Zé", phone: "5511999990103", kind: "cliente" } }),
+  makeCard({ id: "b", title: "Quando vence o DAS?", sector: "fiscal", idle_hours: 52, contact: { id: "c-2", name: "Oficina do Zé", phone: "5511999990103", kind: "cliente", priority: false } }),
   makeCard({ id: "c", title: "Abertura da filial", status: "em_andamento", sector: "societario", urgency: "alta", idle_hours: 20, assignee: julia, progress: { done: 2, total: 5, percent: 40 } }),
   makeCard({ id: "d", title: "Pedido de folga", sector: "rh-interno", idle_hours: 6 }),
   makeCard({ id: "e", title: "Alvará renovado", status: "concluido", closed_at: "2026-10-22T12:00:00Z", idle_hours: 0 }),

@@ -6,8 +6,8 @@ import type { ContactRef } from "../../api/types";
 import { COLABORADOR, SOCIO } from "../../test/fixtures";
 import { renderApp, type Handlers } from "../../test/utils";
 
-const padaria: ContactRef = { id: "c-1", name: "Padaria Estrela", phone: "5511999990101", kind: "cliente" };
-const semNome: ContactRef = { id: "c-2", name: null, phone: "5511999990102", kind: "desconhecido" };
+const padaria: ContactRef = { id: "c-1", name: "Padaria Estrela", phone: "5511999990101", kind: "cliente", priority: false };
+const semNome: ContactRef = { id: "c-2", name: null, phone: "5511999990102", kind: "desconhecido", priority: false };
 
 function open(extra: Handlers = {}, me = SOCIO) {
   return renderApp(<AppRoutes />, {
@@ -113,5 +113,24 @@ describe("contacts page", () => {
       "href",
       "/contatos/c-1/conversa",
     );
+  });
+
+  it("marks and unmarks a client as priority", async () => {
+    const key = "PATCH /api/v1/contacts/c-1";
+    const { calls } = open({ [key]: ({ body }) => [200, { ...padaria, ...body }] });
+
+    const star = await screen.findByRole("button", { name: "Marcar Padaria Estrela como prioritário" });
+    expect(star).toHaveAttribute("aria-pressed", "false");
+    await userEvent.click(star);
+
+    await waitFor(() => expect(calls.find((call) => call.key === key)?.body).toEqual({ priority: true }));
+  });
+
+  it("shows a priority client as marked", async () => {
+    open({ "GET /api/v1/contacts": () => [200, [{ ...padaria, priority: true }]] });
+
+    const star = await screen.findByRole("button", { name: "Tirar a prioridade de Padaria Estrela" });
+
+    expect(star).toHaveAttribute("aria-pressed", "true");
   });
 });

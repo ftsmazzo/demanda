@@ -69,6 +69,7 @@ export function CardBody({ card, index }: { card: Card; index: number }) {
               <Icon name="lock" size={13} />
             </span>
           ) : null}
+          {card.contact?.priority ? <span className="vip-tag">Prioritário</span> : null}
           {card.needs_review ? <span className="review-tag">Confirmar</span> : null}
           {flagged ? (
             <span className="urgency" data-level={card.urgency}>
@@ -107,7 +108,7 @@ export function DemandCard({ card, index, selected, onOpen }: Props) {
       data-dragging={isDragging}
       aria-current={selected ? "true" : undefined}
       data-card-id={card.id}
-      aria-label={`${card.title}. ${who}. ${idleBadge(card)}.${card.needs_review ? " Precisa de confirmação." : ""}`}
+      aria-label={`${card.title}. ${who}. ${idleBadge(card)}.${card.contact?.priority ? " Cliente prioritário." : ""}${card.needs_review ? " Precisa de confirmação." : ""}`}
       onClick={() => onOpen(card)}
       {...listeners}
       {...attributes}

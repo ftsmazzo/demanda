@@ -21,7 +21,7 @@ const reuniao: Appointment = {
   status: "proposed",
   demand_id: "d1",
   sector: "societario",
-  contact: { id: "c1", name: "Poli", phone: "5511999990101", kind: "cliente" },
+  contact: { id: "c1", name: "Poli", phone: "5511999990101", kind: "cliente", priority: false },
 };
 const confirmada: Appointment = {
   ...reuniao,

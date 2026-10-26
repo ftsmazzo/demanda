@@ -1,5 +1,6 @@
 /* controles da barra de ferramentas */
 .select,
+.chip,
 .btn {
   height: 36px;
   border: 1px solid var(--rule-strong);
@@ -19,6 +20,7 @@
 }
 
 .select:hover,
+.chip:hover,
 .btn:hover {
   border-color: var(--ink-3);
 }
@@ -417,4 +419,43 @@
   .modal-row {
     grid-template-columns: 1fr;
   }
+}
+
+.chip[aria-pressed="true"] {
+  border-color: var(--azinhavre);
+  background: var(--azinhavre-wash);
+  color: var(--azinhavre-deep);
+  font-weight: 600;
+}
+
+.vip-tag {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--azinhavre-wash);
+  color: var(--azinhavre-deep);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.star-btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--radius-m);
+  background: transparent;
+  color: var(--ink-3);
+}
+
+.star-btn:hover {
+  color: var(--ink);
+}
+
+.star-btn[aria-pressed="true"] {
+  color: var(--palha);
+}
+
+.star-btn[aria-pressed="true"] svg {
+  fill: currentColor;
 }

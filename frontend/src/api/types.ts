@@ -23,6 +23,7 @@ export interface ContactRef {
   name: string | null;
   phone: string;
   kind: ContactKind;
+  priority: boolean;
 }
 
 export interface Progress {
@@ -167,6 +168,7 @@ export interface DemandCreate {
 export interface BoardFilters {
   sector?: Sector | "";
   assignee?: string;
+  priority?: boolean;
 }
 
 export interface ChannelHealth {

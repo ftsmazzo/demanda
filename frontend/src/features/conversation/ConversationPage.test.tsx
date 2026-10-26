@@ -6,7 +6,7 @@ import type { Conversation } from "../../api/types";
 import { COLABORADOR, SOCIO, makeBoard, makeCard, makeDetail } from "../../test/fixtures";
 import { renderApp, type Handlers } from "../../test/utils";
 
-const poli = { id: "c-1", name: "Poli", phone: "5511999990101", kind: "cliente" as const };
+const poli = { id: "c-1", name: "Poli", phone: "5511999990101", kind: "cliente" as const, priority: false };
 
 const conversation = (): Conversation => ({
   contact: poli,
