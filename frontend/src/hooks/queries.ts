@@ -71,7 +71,18 @@ export function usePatchAppointment() {
   const { api } = useAuth();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, status }: { id: string; status: AppointmentStatus }) => api.patchAppointment(id, { status }),
+    mutationFn: ({ id, ...patch }: { id: string; status?: AppointmentStatus; starts_at?: string; all_day?: boolean }) =>
+      api.patchAppointment(id, patch),
     onSettled: () => void queryClient.invalidateQueries({ queryKey: ["appointments"] }),
+  });
+}
+
+export function useConversation(contactId: string | undefined) {
+  const { api } = useAuth();
+  return useQuery({
+    queryKey: ["conversation", contactId],
+    queryFn: () => api.conversation(contactId as string),
+    enabled: Boolean(contactId),
+    refetchInterval: 30_000,
   });
 }

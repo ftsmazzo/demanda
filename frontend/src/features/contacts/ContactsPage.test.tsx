@@ -103,4 +103,15 @@ describe("contacts page", () => {
 
     await waitFor(() => expect(screen.queryByRole("heading", { name: "Contatos" })).not.toBeInTheDocument());
   });
+
+  it("links each contact to the whole conversation", async () => {
+    open();
+
+    const row = (await screen.findByText("Padaria Estrela")).closest("li")!;
+
+    expect(within(row).getByRole("link", { name: "Ver conversa de Padaria Estrela" })).toHaveAttribute(
+      "href",
+      "/contatos/c-1/conversa",
+    );
+  });
 });

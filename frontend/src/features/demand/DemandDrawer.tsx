@@ -5,6 +5,7 @@ import { Icon } from "../../components/Icon";
 import { useDemand } from "../../hooks/demand";
 import { idleSentence } from "../../lib/format";
 import { SECTOR_COLOR, SECTOR_LABEL } from "../../lib/sectors";
+import { CaseAppointments, CaseHistory, CaseSummary, ConversationLink, ReviewNotice } from "./CaseParts";
 import { Conversation } from "./Conversation";
 import { Properties } from "./Properties";
 import { Steps } from "./Steps";
@@ -79,9 +80,14 @@ export function DemandDrawer({ id, me, onClose }: Props) {
         ) : null}
         {data ? (
           <>
+            <ReviewNotice demand={data} me={me} />
+            <CaseSummary demand={data} />
             <Properties demand={data} me={me} />
+            <CaseAppointments appointments={data.appointments} />
             <Conversation messages={data.messages} />
+            <ConversationLink demand={data} />
             <Steps demand={data} />
+            <CaseHistory events={data.events} />
           </>
         ) : null}
       </div>

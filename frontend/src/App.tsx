@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell, RequireAuth, RequireRole } from "./components/AppShell";
 import { BoardPage } from "./features/board/BoardPage";
 import { AgendaPage } from "./features/agenda/AgendaPage";
+import { ConversationPage } from "./features/conversation/ConversationPage";
 import { ContactsPage } from "./features/contacts/ContactsPage";
 import { Login } from "./features/login/Login";
 import { PanelPage } from "./features/panel/PanelPage";
@@ -27,6 +28,14 @@ export function AppRoutes() {
             element={
               <RequireRole roles={["socio", "gestor"]}>
                 <ContactsPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="contatos/:contactId/conversa"
+            element={
+              <RequireRole roles={["socio", "gestor"]}>
+                <ConversationPage />
               </RequireRole>
             }
           />

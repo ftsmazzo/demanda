@@ -81,3 +81,17 @@ export function useCreateDemand() {
     },
   });
 }
+
+export function useMergeDemand() {
+  const { api } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, into }: { id: string; into: string }) => api.mergeDemand(id, into),
+    onSuccess: (detail, { id }) => {
+      queryClient.setQueryData(demandKey(detail.id), detail);
+      queryClient.removeQueries({ queryKey: demandKey(id) });
+      void queryClient.invalidateQueries({ queryKey: ["board"] });
+      void queryClient.invalidateQueries({ queryKey: ["appointments"] });
+    },
+  });
+}

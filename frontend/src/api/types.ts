@@ -47,6 +47,10 @@ export interface Card {
   last_activity_at: string;
   closed_at: string | null;
   idle_hours: number;
+  summary: string | null;
+  next_step: string | null;
+  needs_review: boolean;
+  review_reason: string | null;
 }
 
 export interface Message {
@@ -63,9 +67,49 @@ export interface Subtask {
   done: boolean;
 }
 
+export type EventKind =
+  | "created"
+  | "attached"
+  | "summary"
+  | "appointment_created"
+  | "appointment_updated"
+  | "proposal"
+  | "merged"
+  | "split"
+  | "review";
+
+export interface CaseEvent {
+  id: string;
+  actor: "ai" | "rules" | "user";
+  kind: EventKind;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  data: Record<string, any>;
+  created_at: string;
+}
+
+export interface AppointmentBrief {
+  id: string;
+  title: string;
+  starts_at: string;
+  all_day: boolean;
+  status: "proposed" | "confirmed" | "cancelled";
+}
+
 export interface Detail extends Card {
   messages: Message[];
   subtasks: Subtask[];
+  events: CaseEvent[];
+  appointments: AppointmentBrief[];
+}
+
+export interface ConversationMessage extends Message {
+  demand_id: string | null;
+}
+
+export interface Conversation {
+  contact: ContactRef;
+  cases: Card[];
+  messages: ConversationMessage[];
 }
 
 export interface Column {
@@ -106,6 +150,7 @@ export interface DemandPatch {
   sector?: Sector;
   due_date?: string | null;
   assignee_id?: string | null;
+  needs_review?: boolean;
 }
 
 export interface DemandCreate {

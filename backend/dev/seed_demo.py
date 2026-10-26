@@ -282,4 +282,57 @@ def seed(conn: psycopg.Connection) -> dict[str, str]:
                 "INSERT INTO demand_messages (tenant_id, demand_id, message_id) VALUES (%s, %s, %s)",
                 (tenant, demand, message),
             )
+    _seed_cases(conn, tenant)
     return {"tenant": TENANT_SLUG, "password": PASSWORD}
+
+
+def _seed_cases(conn: psycopg.Connection, tenant) -> None:
+    """Resumo, proximo passo, historico, compromisso e um caso a revisar (como a IA deixaria)."""
+    rows = conn.execute(
+        "SELECT id, title, contact_id FROM demands WHERE tenant_id = %s ORDER BY created_at LIMIT 4",
+        (tenant,),
+    ).fetchall()
+    notes = [
+        (
+            "O cliente pediu a guia do DAS de outubro e quer receber ainda hoje.",
+            "Emitir a guia e enviar pelo WhatsApp.",
+        ),
+        (
+            "Reuniao para definir o projeto IE, ainda sem confirmacao de todos.",
+            "Confirmar o horario com a Poli.",
+        ),
+        ("A funcionaria Ana pediu ferias para dezembro.", "Lancar as ferias no sistema de RH."),
+        (
+            "Balancete de setembro em conferencia, faltam dois extratos.",
+            "Cobrar os extratos do cliente.",
+        ),
+    ]
+    for (demand, _title, _contact), (summary, step) in zip(rows, notes, strict=False):
+        conn.execute(
+            "UPDATE demands SET summary = %s, next_step = %s, ai_updated_at = now() WHERE id = %s",
+            (summary, step, demand),
+        )
+        conn.execute(
+            "INSERT INTO case_events (tenant_id, demand_id, actor, kind) VALUES (%s, %s, 'ai', 'created')",
+            (tenant, demand),
+        )
+        conn.execute(
+            "INSERT INTO case_events (tenant_id, demand_id, actor, kind) VALUES (%s, %s, 'ai', 'attached')",
+            (tenant, demand),
+        )
+    if len(rows) >= 2:
+        demand, _, contact = rows[1]
+        conn.execute(
+            "INSERT INTO appointments (tenant_id, demand_id, contact_id, title, starts_at, status) "
+            "VALUES (%s, %s, %s, 'Reuniao do projeto IE', now() + interval '2 days', 'proposed')",
+            (tenant, demand, contact),
+        )
+        conn.execute(
+            "UPDATE demands SET needs_review = true, review_reason = 'confirmar agrupamento' WHERE id = %s",
+            (rows[3][0],),
+        )
+        conn.execute(
+            "INSERT INTO case_events (tenant_id, demand_id, actor, kind, data) "
+            "VALUES (%s, %s, 'ai', 'review', %s)",
+            (tenant, rows[3][0], '{"reason": "confirmar agrupamento", "candidate": null}'),
+        )

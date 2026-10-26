@@ -5,6 +5,7 @@ import type {
   AppointmentStatus,
   BoardFilters,
   ChannelHealth,
+  Conversation,
   ContactKind,
   ContactRef,
   DemandCreate,
@@ -44,8 +45,15 @@ export function createApi(client: Client) {
       request<Subtask>("PATCH", `/api/v1/subtasks/${safeId(id)}`, patch),
     channelsHealth: () => request<ChannelHealth[]>("GET", "/api/v1/channels/health"),
     appointments: () => request<Appointment[]>("GET", "/api/v1/appointments"),
-    patchAppointment: (id: string, patch: { status?: AppointmentStatus }) =>
+    patchAppointment: (
+      id: string,
+      patch: { status?: AppointmentStatus; starts_at?: string; all_day?: boolean },
+    ) =>
       request<Appointment>("PATCH", `/api/v1/appointments/${safeId(id)}`, patch),
+    mergeDemand: (id: string, into: string) =>
+      request<Detail>("POST", `/api/v1/demands/${safeId(id)}/merge`, { into }),
+    conversation: (contactId: string) =>
+      request<Conversation>("GET", `/api/v1/contacts/${safeId(contactId)}/conversation`),
     users: () => request<UserOut[]>("GET", "/api/v1/users"),
     contacts: (query: { q?: string; kind?: ContactKind | "" } = {}) =>
       request<ContactRef[]>("GET", "/api/v1/contacts", undefined, { query: { ...query, limit: 100 } }),

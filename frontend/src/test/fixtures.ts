@@ -21,6 +21,10 @@ export function makeCard(overrides: Partial<Card> = {}): Card {
     last_activity_at: "2026-10-20T12:00:00Z",
     closed_at: null,
     idle_hours: 2,
+    summary: null,
+    next_step: null,
+    needs_review: false,
+    review_reason: null,
     ...overrides,
   };
 }
@@ -33,6 +37,8 @@ export function makeDetail(overrides: Partial<Detail> = {}): Detail {
       { id: "m-2", direction: "out", text: "Já estamos vendo.", type: "conversation", sent_at: "2026-10-20T12:30:00Z" },
     ],
     subtasks: [],
+    events: [],
+    appointments: [],
     ...overrides,
   };
 }

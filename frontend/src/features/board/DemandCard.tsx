@@ -58,6 +58,7 @@ export function CardBody({ card, index }: { card: Card; index: number }) {
       </span>
       <span className="card-title">{card.title}</span>
       <span className="card-who">{card.contact?.name ?? "Contato sem nome"}</span>
+      {card.summary ? <span className="card-summary">{card.summary}</span> : null}
       <span className="card-meta">
         <span className="card-tags">
           <span className="sector" style={{ "--dot": SECTOR_COLOR[card.sector] } as CSSProperties}>
@@ -68,6 +69,7 @@ export function CardBody({ card, index }: { card: Card; index: number }) {
               <Icon name="lock" size={13} />
             </span>
           ) : null}
+          {card.needs_review ? <span className="review-tag">Confirmar</span> : null}
           {flagged ? (
             <span className="urgency" data-level={card.urgency}>
               {card.urgency === "critica" ? "Crítica" : "Alta"}
@@ -105,7 +107,7 @@ export function DemandCard({ card, index, selected, onOpen }: Props) {
       data-dragging={isDragging}
       aria-current={selected ? "true" : undefined}
       data-card-id={card.id}
-      aria-label={`${card.title}. ${who}. ${idleBadge(card)}.`}
+      aria-label={`${card.title}. ${who}. ${idleBadge(card)}.${card.needs_review ? " Precisa de confirmação." : ""}`}
       onClick={() => onOpen(card)}
       {...listeners}
       {...attributes}

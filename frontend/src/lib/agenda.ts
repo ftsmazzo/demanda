@@ -34,3 +34,12 @@ export function groupByDay(items: Appointment[], now: Date = new Date()): DayGro
   }
   return groups;
 }
+
+export function whenLabel(iso: string, allDay: boolean): string {
+  const date = new Date(iso);
+  const weekday = date.toLocaleDateString("pt-BR", { weekday: "long" });
+  const day = date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  if (allDay) return `${weekday}, ${day} o dia todo`;
+  const time = date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
+  return `${weekday}, ${day} às ${time}`;
+}

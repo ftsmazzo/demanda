@@ -98,6 +98,17 @@ Sem `AGENT_SEND=1` o agente trabalha em **ensaio**: grava o texto e marca `dry_r
 
 Com `AGENT_WEBHOOK_SECRET`, a instancia do agente passa a enviar suas mensagens recebidas para `POST /webhooks/agent` (evento `MESSAGES_UPSERT`, cabecalho `X-Webhook-Secret`). O painel do Manager nao aceita o cabecalho: use `python -m app.cli setup-agent-webhook` no console da api, que configura a instancia pela API da Evolution (`POST /webhook/set`) e confere o resultado. Precisa de `EVOLUTION_URL`, `EVOLUTION_API_KEY`, `AGENT_INSTANCE`, `AGENT_APP_URL` e `AGENT_WEBHOOK_SECRET` no ambiente; sem o segredo, o comando gera um para voce salvar antes. Quem escreve e identificado pelo telefone: so destinatarios cadastrados sao atendidos; numero desconhecido ou cadastrado em mais de uma empresa e ignorado em silencio. Comandos: `1` confirma e `2` cancela o compromisso mais recente ainda proposto que o agente avisou; `parado`/`pendencias` lista as demandas paradas ha 24 h ou mais; `agenda` mostra hoje e amanha; `ajuda` explica. Qualquer outro texto recebe "nao entendi" e nada e alterado (confirmar so vale com a palavra ou o numero sozinhos). Cada resposta e registrada na caixa de saida (`kind reply`), uma por mensagem recebida, no maximo 60 por pessoa em 24 h.
 
+## Casos (Etapa 1)
+
+A demanda e o **caso**: alem do titulo, tem `summary` (resumo escrito pela IA), `next_step`, `needs_review`/`review_reason` e um historico em `case_events` (quem mudou o que, e a mensagem de origem). Detalhes de desenho em `docs/etapa-1-casos.md`.
+
+- `GET /api/v1/demands/{id}` devolve tambem `events` e `appointments` do caso.
+- `PATCH /api/v1/demands/{id}` aceita `{"needs_review": false}` (socio e gestor) para dispensar o aviso de revisao.
+- `POST /api/v1/demands/{id}/merge` com `{"into": "<id>"}` junta o caso no outro do **mesmo contato**: mensagens, etapas, compromissos e historico vao para o destino e o de origem some (a funcao `delete_empty_demand` so apaga caso vazio).
+- `GET /api/v1/contacts/{id}/conversation` devolve a conversa inteira (as duas pontas, ultimas 200 mensagens), os casos e a que caso cada mensagem pertence. Socio e gestor; conversa com funcionario do escritorio (contato `colaborador`) so para quem tem acesso ao RH; mensagens de casos fora da visibilidade do usuario ficam de fora.
+
+O ciclo do worker usa a IA de caso quando ha chave (`OPENROUTER_API_KEY` ou `ANTHROPIC_API_KEY`) e `CASE_LLM` nao e `off`. Para cada mensagem a IA recebe so o contato, os casos abertos dele e os compromissos, e decide anexar, abrir um caso novo ou ignorar. O codigo faz as contas de data. Confianca abaixo de 0,6 nunca altera o que existe: abre um caso separado marcado "confirmar agrupamento"; remarcacao abaixo de 0,8 vira so uma proposta (aplicavel na gaveta do caso). Falha da IA, resposta fora do contrato ou teto diario (`CASE_DAILY_CAP`) voltam ao agrupamento por regras.
+
 ## Limitacoes conhecidas
 
 - A interface web (`frontend/`) e servida pela propria API a partir de `STATIC_DIR` (a imagem Docker ja a embute em `/app/static`). Mesma origem, sem CORS.

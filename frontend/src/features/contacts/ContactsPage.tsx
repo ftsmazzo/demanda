@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent, type KeyboardEvent } from "react";
+import { Link } from "react-router-dom";
 import type { ContactKind, ContactRef } from "../../api/types";
 import { useContacts, usePatchContact } from "../../hooks/queries";
 import { saveErrorMessage } from "../../lib/errors";
@@ -86,6 +87,9 @@ function ContactRow({ contact, onError }: { contact: ContactRef; onError: (error
         )}
       </div>
       <span className="contact-phone num">{formatPhone(contact.phone)}</span>
+      <Link className="link-btn" to={`/contatos/${contact.id}/conversa`} aria-label={`Ver conversa de ${label}`}>
+        Ver conversa
+      </Link>
       <select
         className="select"
         aria-label={`Tipo de ${label}`}
