@@ -2,7 +2,16 @@
 
 from dataclasses import dataclass
 
-SECTORS = ("triagem", "fiscal", "contabil", "dp", "societario", "financeiro", "rh-interno")
+SECTORS = (
+    "triagem",
+    "fiscal",
+    "contabil",
+    "dp",
+    "societario",
+    "financeiro",
+    "rh-interno",
+    "consultoria",
+)
 KINDS = ("tarefa", "compromisso", "duvida", "documento", "cobranca", "reclamacao")
 STORED_KINDS = (*KINDS, "ruido", "indefinido")
 URGENCIES = ("normal", "alta", "critica")

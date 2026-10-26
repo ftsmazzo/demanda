@@ -41,6 +41,7 @@ SECTOR_LABEL = {
     "financeiro": "Financeiro",
     "triagem": "Triagem",
     "rh-interno": "RH interno",
+    "consultoria": "Consultoria",
 }
 
 _IDLE = "FLOOR(EXTRACT(EPOCH FROM (%s::timestamptz - d.last_activity_at)) / 3600)::int"

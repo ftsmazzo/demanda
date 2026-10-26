@@ -6,7 +6,8 @@ export type Sector =
   | "dp"
   | "societario"
   | "financeiro"
-  | "rh-interno";
+  | "rh-interno"
+  | "consultoria";
 export type Urgency = "normal" | "alta" | "critica";
 export type Kind = "tarefa" | "compromisso" | "duvida" | "documento" | "cobranca" | "reclamacao";
 export type ContactKind = "cliente" | "fornecedor" | "colaborador" | "desconhecido";

@@ -8,6 +8,7 @@ export const SECTOR_LABEL: Record<Sector, string> = {
   financeiro: "Financeiro",
   triagem: "Triagem",
   "rh-interno": "RH interno",
+  consultoria: "Consultoria",
 };
 
 export const SECTOR_COLOR: Record<Sector, string> = {
@@ -18,6 +19,7 @@ export const SECTOR_COLOR: Record<Sector, string> = {
   financeiro: "var(--sector-financeiro)",
   triagem: "var(--sector-triagem)",
   "rh-interno": "var(--sector-rh)",
+  consultoria: "var(--sector-consultoria)",
 };
 
 export const SECTORS = Object.keys(SECTOR_LABEL) as Sector[];

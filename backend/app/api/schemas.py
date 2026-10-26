@@ -5,7 +5,16 @@ from uuid import UUID
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 Status = Literal["novo", "em_andamento", "aguardando", "concluido"]
-Sector = Literal["triagem", "fiscal", "contabil", "dp", "societario", "financeiro", "rh-interno"]
+Sector = Literal[
+    "triagem",
+    "fiscal",
+    "contabil",
+    "dp",
+    "societario",
+    "financeiro",
+    "rh-interno",
+    "consultoria",
+]
 Kind = Literal["tarefa", "compromisso", "duvida", "documento", "cobranca", "reclamacao", "nota"]
 Urgency = Literal["normal", "alta", "critica"]
 ContactKind = Literal["cliente", "fornecedor", "colaborador", "desconhecido"]

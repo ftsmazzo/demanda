@@ -41,6 +41,14 @@ _SECTOR_KEYWORDS: dict[str, tuple[tuple[str, int], ...]] = {
         (r"\b(balancete|conciliacao|dre|fechamento|balanco|lancamentos?)\b", 1),
         (r"\b(plano de contas|demonstracoes? contabeis?|livro razao)\b", 1),
     ),
+    "consultoria": (
+        (r"\b(consultoria|consultor|consultora|assessoria|parecer|pareceres)\b", 1),
+        (
+            r"\b(planejamento (tributario|financeiro|estrategico|societario)|diagnostico)\b",
+            1,
+        ),
+        (r"\b(viabilidade|valuation|projecao|projecoes)\b", 1),
+    ),
     "financeiro": (
         (r"\b(boletos?|honorarios?|cobranca|pagamento|pagar|fornecedor|mensalidade)\b", 1),
         (r"\b(fatura|pix|inadimplencia)\b", 1),
