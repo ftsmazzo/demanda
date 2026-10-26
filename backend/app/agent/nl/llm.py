@@ -11,7 +11,7 @@ from typing import Any, Protocol
 
 import anthropic
 
-from app.agent.nl.contract import OUTPUT_SCHEMA, Intent, parse_intent
+from app.agent.nl.contract import NONE, OUTPUT_SCHEMA, Intent, parse_intent
 from app.classification.llm import ClassifierUnavailable, sanitize_untrusted
 from app.classification.openrouter import (
     OPENROUTER_URL,
@@ -20,6 +20,7 @@ from app.classification.openrouter import (
     describe_http_error,
     error_detail,
 )
+from app.core.sectors import allowed_slugs, prompt_block, schema_with_sectors
 
 DEFAULT_OPENROUTER_MODEL = "anthropic/claude-haiku-5.5"
 DEFAULT_ANTHROPIC_MODEL = "claude-haiku-5-5"
@@ -74,6 +75,16 @@ SYSTEM_PROMPT = (
 class IntentContext:
     now: datetime  # hora local do escritorio
     team: tuple[str, ...]  # nomes das pessoas ativas
+    sectors: tuple[tuple[str, str], ...] = ()  # (slug, nome) ativos; vazio = padrao do codigo
+
+
+def system_prompt(ctx: IntentContext) -> str:
+    block = prompt_block(ctx.sectors)
+    return f"{SYSTEM_PROMPT}\n\n{block}" if block else SYSTEM_PROMPT
+
+
+def output_schema(ctx: IntentContext) -> dict[str, Any]:
+    return schema_with_sectors(OUTPUT_SCHEMA, ctx.sectors, extra=(NONE,))
 
 
 class IntentLLM(Protocol):
@@ -113,12 +124,16 @@ class OpenRouterIntentLLM:
                 "model": self._model,
                 "max_tokens": 600,
                 "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "system", "content": system_prompt(ctx)},
                     {"role": "user", "content": build_user_prompt(text, ctx)},
                 ],
                 "response_format": {
                     "type": "json_schema",
-                    "json_schema": {"name": "pedido", "strict": True, "schema": OUTPUT_SCHEMA},
+                    "json_schema": {
+                        "name": "pedido",
+                        "strict": True,
+                        "schema": output_schema(ctx),
+                    },
                 },
                 "provider": {"require_parameters": True},
             }
@@ -155,7 +170,7 @@ class OpenRouterIntentLLM:
             data = json.loads(fenced.group(1) if fenced else content)
         except json.JSONDecodeError as exc:
             raise ValueError("resposta da IA nao e JSON") from exc
-        return parse_intent(data)
+        return parse_intent(data, allowed_slugs(ctx.sectors))
 
 
 class AnthropicIntentLLM:
@@ -172,11 +187,11 @@ class AnthropicIntentLLM:
             response = self._client.messages.create(
                 model=self._model,
                 max_tokens=600,
-                system=SYSTEM_PROMPT,
+                system=system_prompt(ctx),
                 messages=[{"role": "user", "content": build_user_prompt(text, ctx)}],
                 output_config={
                     "effort": "low",
-                    "format": {"type": "json_schema", "schema": OUTPUT_SCHEMA},
+                    "format": {"type": "json_schema", "schema": output_schema(ctx)},
                 },
             )
         except anthropic.APIError as exc:
@@ -190,7 +205,7 @@ class AnthropicIntentLLM:
             data = json.loads(texts[-1])
         except json.JSONDecodeError as exc:
             raise ValueError("resposta da IA nao e JSON") from exc
-        return parse_intent(data)
+        return parse_intent(data, allowed_slugs(ctx.sectors))
 
 
 def build_intent_llm(env: Mapping[str, str]) -> tuple[IntentLLM | None, str]:

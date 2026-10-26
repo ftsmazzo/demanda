@@ -32,6 +32,8 @@ class Context:
     has_media: bool = False
     channel_default_sector: str | None = None
     recent: tuple[str, ...] = ()
+    # setores ativos do tenant (slug, nome); vazio = o conjunto padrao do codigo
+    sectors: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

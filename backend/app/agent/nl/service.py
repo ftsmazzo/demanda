@@ -13,9 +13,9 @@ from app.agent.nl import actions, queries
 from app.agent.nl.contract import Intent
 from app.agent.nl.llm import IntentContext, IntentLLM
 from app.agent.nl.lookup import find_appointments, find_contacts, find_demands, find_users
-from app.agent.runner import SECTOR_LABEL
 from app.core.appointments import _tenant_zone
 from app.core.schedule import extract_when
+from app.core.sectors import active_infos, is_active, labels
 from app.db import Database
 
 logger = logging.getLogger(__name__)
@@ -84,13 +84,13 @@ def _propose_task(conn, tenant_id, recipient_id, intent: Intent, local_now, now)
             "SELECT sector FROM user_sectors WHERE user_id = %s", (assignee_id,)
         ).fetchall()
         sector = owned[0][0] if len(owned) == 1 else None
-    sector = sector or "triagem"
+    sector = sector if sector and is_active(conn, sector) else "triagem"
     due = extract_when(intent.due_phrase, local_now) if intent.due_phrase else None
     parts = [f"criar a tarefa *{intent.title}*"]
     parts.append(f"para {assignee_name}" if assignee_name else "sem responsável")
     if contact_name:
         parts.append(f"do cliente {contact_name}")
-    parts.append(f"({SECTOR_LABEL.get(sector, sector)})")
+    parts.append(f"({labels(conn).get(sector, sector)})")
     if due:
         parts.append(f"com prazo {_day(due.start.date())}")
     summary = " ".join(parts) + note
@@ -253,8 +253,9 @@ def natural_reply(
         team = tuple(
             row[0] for row in conn.execute("SELECT name FROM users WHERE active ORDER BY name")
         )[:MAX_TEAM]
+        sectors = active_infos(conn)
     try:
-        intent = llm.understand(text, IntentContext(now.astimezone(zone), team))
+        intent = llm.understand(text, IntentContext(now.astimezone(zone), team, sectors))
     except Exception as exc:
         logger.warning("IA do agente falhou (%s)", type(exc).__name__)
         return unknown_text()

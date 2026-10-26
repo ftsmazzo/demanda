@@ -94,7 +94,9 @@ def _confidence(value: Any) -> float:
     return float(value)
 
 
-def parse_case_output(data: Any, *, open_cases: int, appointments: int) -> CaseDecision:
+def parse_case_output(
+    data: Any, *, open_cases: int, appointments: int, sectors: tuple[str, ...] | None = None
+) -> CaseDecision:
     if not isinstance(data, dict):
         raise ValueError("resposta da IA nao e um objeto")
     action = data.get("action")
@@ -130,7 +132,7 @@ def parse_case_output(data: Any, *, open_cases: int, appointments: int) -> CaseD
     kind, sector, urgency = data.get("kind"), data.get("sector"), data.get("urgency")
     if kind not in CASE_KINDS:
         raise ValueError(f"tipo invalido: {kind!r}")
-    if sector not in SECTORS:
+    if sector not in (sectors or SECTORS):
         raise ValueError(f"setor invalido: {sector!r}")
     if urgency not in URGENCIES:
         raise ValueError(f"urgencia invalida: {urgency!r}")

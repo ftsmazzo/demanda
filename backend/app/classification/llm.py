@@ -8,6 +8,7 @@ from typing import Any, Protocol
 import anthropic
 
 from app.classification.domain import KINDS, SECTORS, URGENCIES, Context, LLMOutput
+from app.core.sectors import allowed_slugs, prompt_block, schema_with_sectors
 
 DEFAULT_MODEL = "claude-haiku-5-5"
 MAX_CLIENT_HINT = 100
@@ -62,7 +63,17 @@ class LLMClassifier(Protocol):
     def classify(self, text: str, context: Context, hints: dict[str, Any]) -> LLMOutput: ...
 
 
-def parse_llm_output(data: Any) -> LLMOutput:
+def system_prompt(context: Context) -> str:
+    """Prompt de sistema com os setores ativos deste escritorio (os do codigo se nao ha lista)."""
+    block = prompt_block(context.sectors)
+    return f"{SYSTEM_PROMPT}\n\n{block}" if block else SYSTEM_PROMPT
+
+
+def output_schema(context: Context) -> dict[str, Any]:
+    return schema_with_sectors(OUTPUT_SCHEMA, context.sectors)
+
+
+def parse_llm_output(data: Any, allowed: tuple[str, ...] | None = None) -> LLMOutput:
     """Valida a resposta da IA; qualquer desvio vira ValueError."""
     if not isinstance(data, dict):
         raise ValueError("resposta da IA nao e um objeto")
@@ -73,7 +84,7 @@ def parse_llm_output(data: Any) -> LLMOutput:
     except KeyError as exc:
         raise ValueError(f"campo ausente: {exc}") from exc
 
-    if sector not in SECTORS:
+    if sector not in (allowed or SECTORS):
         raise ValueError(f"setor invalido: {sector!r}")
     if kind not in KINDS:
         raise ValueError(f"tipo invalido: {kind!r}")
@@ -131,11 +142,11 @@ class AnthropicClassifier:
             response = self._client.messages.create(
                 model=self._model,
                 max_tokens=1024,
-                system=SYSTEM_PROMPT,
+                system=system_prompt(context),
                 messages=[{"role": "user", "content": build_user_prompt(text, context, hints)}],
                 output_config={
                     "effort": "low",
-                    "format": {"type": "json_schema", "schema": OUTPUT_SCHEMA},
+                    "format": {"type": "json_schema", "schema": output_schema(context)},
                 },
             )
         except anthropic.APIError as exc:
@@ -150,4 +161,4 @@ class AnthropicClassifier:
             data = json.loads(texts[-1])
         except json.JSONDecodeError as exc:
             raise ValueError("resposta da IA nao e JSON") from exc
-        return parse_llm_output(data)
+        return parse_llm_output(data, allowed_slugs(context.sectors))

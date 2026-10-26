@@ -66,13 +66,16 @@ def create_user(
     sectors: tuple[str, ...] = (),
 ) -> UUID:
     """Cria um usuario do tenant (uso administrativo); o banco guarda so o hash da senha."""
-    from app.classification.domain import SECTORS
     from app.security.passwords import hash_password
     from app.security.tokens import ROLES
 
     if role not in ROLES:
         raise ValueError(f"papel invalido: {role}")
-    unknown = [sector for sector in sectors if sector not in SECTORS]
+    known = {
+        row[0]
+        for row in conn.execute("SELECT slug FROM sectors WHERE tenant_id = %s", (tenant_id,))
+    }
+    unknown = [sector for sector in sectors if sector not in known]
     if unknown:
         raise ValueError(f"setor invalido: {', '.join(unknown)}")
 

@@ -114,7 +114,7 @@ def _flag(data: dict[str, Any], key: str, *, nullable: bool) -> bool | None:
     return value
 
 
-def parse_intent(data: Any) -> Intent:
+def parse_intent(data: Any, sectors: tuple[str, ...] | None = None) -> Intent:
     if not isinstance(data, dict):
         raise ValueError("resposta da IA nao e um objeto")
     name = data.get("intent")
@@ -130,7 +130,7 @@ def parse_intent(data: Any) -> Intent:
         intent=name,
         confidence=float(confidence),
         title=_text(data, "title", MAX_TITLE),
-        sector=_choice(data, "sector", SECTORS),
+        sector=_choice(data, "sector", sectors or SECTORS),
         assignee_name=_text(data, "assignee_name", MAX_NAME),
         contact_name=_text(data, "contact_name", MAX_NAME),
         urgency=_choice(data, "urgency", URGENCIES),

@@ -22,6 +22,7 @@ from app.api.demands import router as demands_router
 from app.api.deps import AuthSettings
 from app.api.flow import router as flow_router
 from app.api.people import router as people_router
+from app.api.sectors import router as sectors_router
 from app.cases.llm import CaseLLM, build_case_llm
 from app.cases.service import DEFAULT_DAILY_CAP
 from app.channel_health import EvolutionLike
@@ -139,6 +140,7 @@ def create_app(
     app.include_router(channels_router)
     app.include_router(appointments_router)
     app.include_router(flow_router)
+    app.include_router(sectors_router)
 
     @app.exception_handler(PoolTimeout)
     async def pool_timeout_handler(_: Request, __: PoolTimeout) -> JSONResponse:

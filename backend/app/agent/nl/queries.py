@@ -7,7 +7,7 @@ import psycopg
 
 from app.agent.nl.contract import Intent
 from app.agent.nl.lookup import find_contacts, find_users
-from app.agent.runner import SECTOR_LABEL
+from app.core.sectors import labels
 
 LIST_LIMIT = 8
 STUCK_HOURS = 24
@@ -29,6 +29,7 @@ def _which(label: str, options: list[tuple[object, str]]) -> str:
 
 def query_demands(conn: psycopg.Connection, intent: Intent, now: datetime, app_url: str) -> str:
     where, params, scope = [], [], []
+    names = labels(conn)
     if intent.assignee_name:
         people = find_users(conn, intent.assignee_name)
         if not people:
@@ -48,7 +49,7 @@ def query_demands(conn: psycopg.Connection, intent: Intent, now: datetime, app_u
     if intent.sector:
         where.append("d.sector = %s")
         params.append(intent.sector)
-        scope.append(f"em {SECTOR_LABEL.get(intent.sector, intent.sector)}")
+        scope.append(f"em {names.get(intent.sector, intent.sector)}")
     if intent.priority_only:
         where.append(
             "EXISTS (SELECT 1 FROM contacts pc WHERE pc.id = d.contact_id AND pc.priority)"
@@ -81,7 +82,7 @@ def query_demands(conn: psycopg.Connection, intent: Intent, now: datetime, app_u
     lines = [f"*{count} {noun}{suffix}*"]
     for title, sector, state, person in rows:
         who = f", {person}" if person and not intent.assignee_name else ""
-        lines.append(f"- {title} ({SECTOR_LABEL.get(sector, sector)}, {_STATUS_LABEL[state]}{who})")
+        lines.append(f"- {title} ({names.get(sector, sector)}, {_STATUS_LABEL[state]}{who})")
     if count > len(rows):
         lines.append(f"...e mais {count - len(rows)}")
     lines.append(f"\nQuadro: {app_url.rstrip('/')}/")

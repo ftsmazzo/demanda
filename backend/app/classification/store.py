@@ -15,6 +15,7 @@ from app.classification.domain import Classification, Context, Decision
 from app.classification.llm import LLMClassifier
 from app.classification.rules import RULES_VERSION
 from app.classification.service import classify_message
+from app.core.sectors import active_infos
 from app.db import Database
 
 logger = logging.getLogger(__name__)
@@ -88,6 +89,7 @@ def classify_pending(
     """
     with db.tenant_transaction(tenant_id) as conn:
         pending = conn.execute(_PENDING, (RULES_VERSION, llm is not None, limit)).fetchall()
+        sectors = active_infos(conn)
         work = []
         for (
             message_id,
@@ -108,6 +110,7 @@ def classify_pending(
                 has_open_demand=has_open,
                 has_media=has_media,
                 recent=tuple(row[0] for row in reversed(recent)),
+                sectors=sectors,
             )
             work.append((message_id, text or "", context, agent_echo))
 

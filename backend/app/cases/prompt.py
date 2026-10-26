@@ -5,6 +5,7 @@ from datetime import datetime
 from uuid import UUID
 
 from app.classification.llm import sanitize_untrusted
+from app.core.sectors import prompt_block
 
 MAX_MESSAGE_CHARS = 2000
 MAX_RECENT = 3
@@ -84,6 +85,14 @@ class CaseContext:
     now: datetime  # na hora local do escritorio
     cases: tuple[OpenCase, ...]
     appointments: tuple[AppointmentRef, ...]
+    # setores ativos do tenant (slug, nome); vazio = o conjunto padrao do codigo
+    sectors: tuple[tuple[str, str], ...] = ()
+
+
+def system_prompt(ctx: CaseContext) -> str:
+    """Prompt de sistema com os setores ativos deste escritorio (os do codigo se nao ha lista)."""
+    block = prompt_block(ctx.sectors)
+    return f"{SYSTEM_PROMPT}\n\n{block}" if block else SYSTEM_PROMPT
 
 
 def _clean(text: str, limit: int) -> str:

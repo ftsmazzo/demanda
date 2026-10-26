@@ -137,3 +137,13 @@ A IA so identifica a intencao e os nomes citados; consultas, listas, contas de d
 - Paginacao por `offset` (a ordem muda quando ha movimentacao); o quadro faz uma consulta por coluna, suficiente para o volume do piloto.
 - Nao ha trilha de auditoria nem revogacao de token (a desativacao do usuario vale na hora, porque o usuario e relido a cada requisicao).
 - O historico de mensagens anterior a migration vira demanda na primeira execucao do `classify-pending`.
+
+## Setores por escritorio
+
+Os setores sao dados do tenant (tabela `sectors`, com RLS), nao uma lista fixa no codigo. Um tenant novo nasce com os oito padrao (gatilho no banco); `triagem` e `rh-interno` sao do sistema e nao podem ser desligados. O banco guarda o setor de demandas, usuarios e classificacoes por chave estrangeira `(tenant_id, setor)`, entao um setor de outro escritorio e recusado.
+
+- `GET /api/v1/sectors` (qualquer usuario): setores ativos, `triagem` primeiro; `rh-interno` so aparece para quem tem acesso. Socio pode passar `?include_inactive=true`.
+- `POST /api/v1/sectors` (so socio): `{label, color?}`. O identificador (`slug`) vem do nome sem acento ("Juridico Trabalhista" vira `juridico-trabalhista`); nome repetido (mesmo slug) responde 409.
+- `PATCH /api/v1/sectors/{slug}` (so socio): `label`, `color` e `active`. O slug nunca muda. Desligar esconde o setor de trabalho novo (criar, mover, IA) e mantem o que ja existe.
+
+As tres IAs (classificacao, casos e agente) recebem so os setores ativos do tenant, no prompt e no esquema de saida. Se a IA ou as regras escolherem um setor desligado, o item cai na `triagem`. As regras por palavra-chave continuam so para os setores padrao; um setor novo e escolhido pela IA a partir do nome.

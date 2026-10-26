@@ -10,7 +10,7 @@ from typing import Any, Protocol
 import anthropic
 
 from app.cases.contract import OUTPUT_SCHEMA, CaseDecision, parse_case_output
-from app.cases.prompt import SYSTEM_PROMPT, CaseContext, build_user_prompt
+from app.cases.prompt import CaseContext, build_user_prompt, system_prompt
 from app.classification.llm import ClassifierUnavailable
 from app.classification.openrouter import (
     OPENROUTER_URL,
@@ -19,6 +19,7 @@ from app.classification.openrouter import (
     describe_http_error,
     error_detail,
 )
+from app.core.sectors import allowed_slugs, schema_with_sectors
 
 DEFAULT_OPENROUTER_MODEL = "anthropic/claude-haiku-5.5"
 DEFAULT_ANTHROPIC_MODEL = "claude-haiku-5-5"
@@ -32,7 +33,12 @@ class CaseLLM(Protocol):
 
 
 def _decision(data: Any, ctx: CaseContext) -> CaseDecision:
-    return parse_case_output(data, open_cases=len(ctx.cases), appointments=len(ctx.appointments))
+    return parse_case_output(
+        data,
+        open_cases=len(ctx.cases),
+        appointments=len(ctx.appointments),
+        sectors=allowed_slugs(ctx.sectors),
+    )
 
 
 class OpenRouterCaseLLM:
@@ -58,12 +64,16 @@ class OpenRouterCaseLLM:
                 "model": self._model,
                 "max_tokens": 1024,
                 "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "system", "content": system_prompt(ctx)},
                     {"role": "user", "content": build_user_prompt(text, ctx)},
                 ],
                 "response_format": {
                     "type": "json_schema",
-                    "json_schema": {"name": "caso", "strict": True, "schema": OUTPUT_SCHEMA},
+                    "json_schema": {
+                        "name": "caso",
+                        "strict": True,
+                        "schema": schema_with_sectors(OUTPUT_SCHEMA, ctx.sectors),
+                    },
                 },
                 "provider": {"require_parameters": True},
             }
@@ -117,11 +127,14 @@ class AnthropicCaseLLM:
             response = self._client.messages.create(
                 model=self._model,
                 max_tokens=1024,
-                system=SYSTEM_PROMPT,
+                system=system_prompt(ctx),
                 messages=[{"role": "user", "content": build_user_prompt(text, ctx)}],
                 output_config={
                     "effort": "low",
-                    "format": {"type": "json_schema", "schema": OUTPUT_SCHEMA},
+                    "format": {
+                        "type": "json_schema",
+                        "schema": schema_with_sectors(OUTPUT_SCHEMA, ctx.sectors),
+                    },
                 },
             )
         except anthropic.APIError as exc:

@@ -19,6 +19,7 @@ from app.api.schemas import (
     SubtaskPatch,
 )
 from app.core.access import HR_SECTOR, can_access_hr, can_create_in, visibility_clause
+from app.core.sectors import is_active
 from app.db import Database
 
 router = APIRouter(prefix="/api/v1")
@@ -69,6 +70,8 @@ def create_demand(body: DemandCreate, user: CurrentUserDep, db: DbDep) -> Detail
     if not can_create_in(user, body.sector):
         raise HTTPException(status_code=403, detail="sem permissao para criar neste setor")
     with db.tenant_transaction(user.tenant_id) as conn:
+        if not is_active(conn, body.sector):
+            raise HTTPException(status_code=422, detail="setor invalido")
         _check_assignee(conn, body.assignee_id, body.sector)
         _check_contact(conn, body.contact_id)
         demand_id = conn.execute(
@@ -94,6 +97,8 @@ def patch_demand(demand_id: UUID, body: DemandPatch, user: CurrentUserDep, db: D
     fields = body.model_fields_set
     clause, params = visibility_clause(user)
     with db.tenant_transaction(user.tenant_id) as conn:
+        if "sector" in fields and body.sector and not is_active(conn, body.sector):
+            raise HTTPException(status_code=422, detail="setor invalido")
         row = conn.execute(
             f"SELECT d.sector, d.assignee_id FROM demands d WHERE d.id = %s AND {clause} "
             "FOR UPDATE OF d",

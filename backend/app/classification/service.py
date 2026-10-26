@@ -1,6 +1,7 @@
 """Orquestra regras, IA e fallback. Nunca perde a mensagem: no pior caso vai para a triagem."""
 
 import logging
+from dataclasses import replace
 
 from app.classification.domain import (
     Classification,
@@ -11,6 +12,7 @@ from app.classification.domain import (
 )
 from app.classification.llm import ClassifierUnavailable, LLMClassifier
 from app.classification.rules import RuleResult, classify_by_rules
+from app.core.sectors import allowed_slugs
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +27,21 @@ def classify_message(
     *,
     llm: LLMClassifier | None = None,
     threshold: float = DEFAULT_THRESHOLD,
+) -> Decision:
+    decision = _classify(text, context, llm=llm, threshold=threshold)
+    allowed = allowed_slugs(context.sectors)
+    if allowed is None or decision.classification.sector in allowed:
+        return decision
+    # setor desligado (ou que o escritorio nao tem): o trabalho novo cai na triagem
+    return replace(decision, classification=replace(decision.classification, sector="triagem"))
+
+
+def _classify(
+    text: str,
+    context: Context,
+    *,
+    llm: LLMClassifier | None,
+    threshold: float,
 ) -> Decision:
     rules = classify_by_rules(text, context)
     default_sector = context.channel_default_sector or "triagem"

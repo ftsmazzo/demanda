@@ -11,12 +11,13 @@ from typing import Any
 
 from app.classification.domain import Context, LLMOutput
 from app.classification.llm import (
-    OUTPUT_SCHEMA,
-    SYSTEM_PROMPT,
     ClassifierUnavailable,
     build_user_prompt,
+    output_schema,
     parse_llm_output,
+    system_prompt,
 )
+from app.core.sectors import allowed_slugs
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +95,7 @@ class OpenRouterClassifier:
                 "model": self._model,
                 "max_tokens": 1024,
                 "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "system", "content": system_prompt(context)},
                     {"role": "user", "content": build_user_prompt(text, context, hints)},
                 ],
                 "response_format": {
@@ -102,7 +103,7 @@ class OpenRouterClassifier:
                     "json_schema": {
                         "name": "classificacao",
                         "strict": True,
-                        "schema": OUTPUT_SCHEMA,
+                        "schema": output_schema(context),
                     },
                 },
                 # so roteia para provedores que respeitam o schema
@@ -145,4 +146,4 @@ class OpenRouterClassifier:
             data = json.loads(fenced.group(1) if fenced else content)
         except json.JSONDecodeError as exc:
             raise ValueError("resposta da IA nao e JSON") from exc
-        return parse_llm_output(data)
+        return parse_llm_output(data, allowed_slugs(context.sectors))

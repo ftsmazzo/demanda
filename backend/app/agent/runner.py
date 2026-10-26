@@ -18,6 +18,7 @@ from app.agent.messages import (
 )
 from app.agent.sender import MessageSender, SendError
 from app.core.appointments import _tenant_zone
+from app.core.sectors import labels
 from app.db import Database
 
 logger = logging.getLogger(__name__)
@@ -94,9 +95,10 @@ def _plan_appointments(conn, tenant_id, recipients, zone, app_url, now) -> None:
         "WHERE a.status = 'proposed' AND a.created_at >= %s ORDER BY a.created_at, a.id",
         (now - APPOINTMENT_WINDOW,),
     ).fetchall()
+    names = labels(conn)
     for appointment_id, title, starts_at, all_day, contact, sector in rows:
         info = AppointmentInfo(
-            title, starts_at.astimezone(zone), all_day, contact, SECTOR_LABEL.get(sector, sector)
+            title, starts_at.astimezone(zone), all_day, contact, names.get(sector, sector)
         )
         body = appointment_text(info, app_url)
         for recipient_id, _ in recipients:
@@ -114,9 +116,9 @@ def stuck_items(
         "ORDER BY idle DESC, d.id LIMIT %s",
         (now, now, minimum, minimum, limit),
     ).fetchall()
+    names = labels(conn)
     return [
-        StuckItem(title, SECTOR_LABEL.get(sector, sector), idle, vip)
-        for title, sector, idle, vip in rows
+        StuckItem(title, names.get(sector, sector), idle, vip) for title, sector, idle, vip in rows
     ]
 
 

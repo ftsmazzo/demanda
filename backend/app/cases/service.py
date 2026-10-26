@@ -24,6 +24,7 @@ from app.classification.domain import max_urgency
 from app.core.appointments import _tenant_zone, insert_appointment
 from app.core.demands import _materialize_one, lift_for_priority, materialize_demands
 from app.core.schedule import When, extract_when
+from app.core.sectors import active_infos
 from app.db import Database
 
 logger = logging.getLogger(__name__)
@@ -123,7 +124,12 @@ def _build_context(
             )
             appointment_ids.append(appt_id)
     ctx = CaseContext(
-        contact_name, contact_kind, sent_at.astimezone(zone), tuple(cases), tuple(appointments)
+        contact_name,
+        contact_kind,
+        sent_at.astimezone(zone),
+        tuple(cases),
+        tuple(appointments),
+        sectors=active_infos(conn),
     )
     return ctx, case_ids, appointment_ids
 
