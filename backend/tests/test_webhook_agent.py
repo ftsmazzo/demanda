@@ -1,3 +1,5 @@
+import uuid
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -6,6 +8,11 @@ from tests.agent_helpers import FakeSender, add_recipient
 from tests.test_agent_inbound import alerted
 
 SECRET = "segredo-do-agente-com-bastante-entropia"
+
+
+def fresh_phone():
+    """Telefone novo a cada teste: o banco e compartilhado e a busca do agente e por telefone."""
+    return "55119" + str(uuid.uuid4().int)[:8]
 
 
 def payload(text, phone="5511999990001", message_id="WA1", from_me=False, event="messages.upsert"):
@@ -58,7 +65,7 @@ def test_the_endpoint_does_not_exist_when_the_agent_is_off(admin_url):
 
 
 def test_an_owner_answering_one_confirms_the_appointment(web, sender, admin_conn, tenant_id):
-    phone = "55119" + "99990003"
+    phone = fresh_phone()
     recipient = add_recipient(admin_conn, tenant_id, phone)
     appointment = alerted(admin_conn, tenant_id, recipient)
 
@@ -73,7 +80,7 @@ def test_an_owner_answering_one_confirms_the_appointment(web, sender, admin_conn
 
 
 def test_strangers_get_no_answer_and_no_information(web, sender):
-    response = post(web, payload("1", phone="5511900000000", message_id="WA-X"))
+    response = post(web, payload("1", phone=fresh_phone(), message_id="WA-X"))
 
     assert response.status_code == 200
     assert sender.sent == []
@@ -82,7 +89,7 @@ def test_strangers_get_no_answer_and_no_information(web, sender):
 def test_what_the_agent_itself_sent_and_other_events_are_ignored(
     web, sender, admin_conn, tenant_id
 ):
-    phone = "5511999990004"
+    phone = fresh_phone()
     add_recipient(admin_conn, tenant_id, phone)
 
     post(web, payload("ajuda", phone=phone, message_id="WA-ME", from_me=True))
@@ -94,7 +101,7 @@ def test_what_the_agent_itself_sent_and_other_events_are_ignored(
 def test_a_phone_registered_in_two_companies_is_not_guessed(
     web, sender, admin_conn, tenant_id, other_channel
 ):
-    phone = "5511999990005"
+    phone = fresh_phone()
     add_recipient(admin_conn, tenant_id, phone)
     add_recipient(admin_conn, other_channel.tenant_id, phone)
 
@@ -106,9 +113,10 @@ def test_a_phone_registered_in_two_companies_is_not_guessed(
 def test_a_brazilian_number_with_or_without_the_ninth_digit_is_the_same_person(
     web, sender, admin_conn, tenant_id
 ):
-    add_recipient(admin_conn, tenant_id, "5511999990006")
+    phone = fresh_phone()
+    add_recipient(admin_conn, tenant_id, phone)
 
-    post(web, payload("ajuda", phone="551199990006", message_id="WA-9"))
+    post(web, payload("ajuda", phone=phone[:4] + phone[5:], message_id="WA-9"))
 
     assert len(sender.sent) == 1
-    assert sender.sent[0][0] == "5511999990006"
+    assert sender.sent[0][0] == phone
