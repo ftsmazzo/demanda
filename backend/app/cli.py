@@ -6,12 +6,15 @@ import os
 import re
 import secrets
 import sys
+from datetime import datetime
 
 import psycopg
 
+from app.agent.runner import QUIET_BEFORE, QUIET_FROM
+from app.cases.llm import build_case_llm
 from app.classification.factory import build_classifier
 from app.classification.store import classify_pending
-from app.core.appointments import backfill_appointments
+from app.core.appointments import _tenant_zone, backfill_appointments
 from app.core.demands import materialize_demands
 from app.db import Database
 from app.evolution_client import EvolutionClient, EvolutionError
@@ -86,6 +89,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "setup-agent-webhook",
         help="configura na Evolution o webhook da instancia do agente (segredo e cabecalho)",
     )
+
+    check = sub.add_parser(
+        "agent-check", help="diagnostico do agente: configuracao, horario e avisos pendentes"
+    )
+    check.add_argument("--tenant-slug", required=True)
 
     sub.add_parser("stats", help="contagem de mensagens e latencia por canal (medicao do spike)")
 
@@ -394,6 +402,68 @@ def _setup_agent_webhook() -> int:
     return 0
 
 
+def _config_lines() -> list[str]:
+    env = os.environ
+    interval = env.get("WORKER_INTERVAL_SECONDS", "0") or "0"
+    worker_on = float(interval) > 0
+    lines = [
+        f"worker: ligado a cada {interval}s"
+        if worker_on
+        else "worker: desligado (defina WORKER_INTERVAL_SECONDS)"
+    ]
+    llm, note = build_case_llm(env)
+    lines.append(
+        f"IA de caso: ligada ({note})" if llm and worker_on else f"IA de caso: desligada ({note})"
+    )
+    missing = [
+        n for n in ("EVOLUTION_URL", "EVOLUTION_API_KEY", "AGENT_INSTANCE") if not env.get(n)
+    ]
+    if missing:
+        lines.append("agente: desligado (faltam: " + ", ".join(missing) + ")")
+    elif env.get("AGENT_SEND") == "1":
+        lines.append("agente: ligado em modo ENVIO REAL")
+    else:
+        lines.append("agente: ligado em modo ENSAIO (nada e enviado; use AGENT_SEND=1 para enviar)")
+    secret = "definido" if env.get("AGENT_WEBHOOK_SECRET") else "NAO definido"
+    lines.append(f"segredo do webhook: {secret}")
+    return lines
+
+
+def _agent_check(conn: psycopg.Connection, args: argparse.Namespace) -> int:
+    tenant_id = _tenant_id(conn, args.tenant_slug)
+    if tenant_id is None:
+        return 1
+    print("Configuracao deste servico:")
+    for line in _config_lines():
+        print("  " + line)
+    zone = _tenant_zone(conn, tenant_id)
+    now = datetime.now(zone)
+    quiet = not QUIET_BEFORE <= now.hour < QUIET_FROM
+    hours = f"FORA do horario ({QUIET_BEFORE:02d}h-{QUIET_FROM:02d}h): os avisos esperam"
+    window = hours if quiet else "dentro do horario de envio"
+    print(f"Agora no escritorio: {now:%d/%m %H:%M} ({window})")
+    recipients = conn.execute(
+        "SELECT count(*) FROM agent_recipients WHERE tenant_id = %s AND active", (tenant_id,)
+    ).fetchone()[0]
+    print(f"destinatarios ativos: {recipients}")
+    rows = conn.execute(
+        "SELECT a.id, a.title, a.starts_at, "
+        "(SELECT count(*) FROM agent_notifications n WHERE n.kind = 'appointment' "
+        " AND n.dedupe_key = a.id::text AND n.status IN ('sent', 'dry_run')) "
+        "FROM appointments a WHERE a.tenant_id = %s AND a.status = 'proposed' "
+        "AND a.created_at >= now() - interval '24 hours' ORDER BY a.created_at",
+        (tenant_id,),
+    ).fetchall()
+    print(f"compromissos propostos nas ultimas 24 h: {len(rows)}")
+    for _, title, starts_at, told in rows:
+        when = starts_at.astimezone(zone).strftime("%d/%m %H:%M")
+        state = f"avisado a {told} de {recipients}" if told else "NAO avisado"
+        print(f'  - "{title[:60]}" ({when}) -> {state}')
+    print("ultimos avisos:")
+    _agent_outbox(conn, argparse.Namespace(tenant_slug=args.tenant_slug, limit=5))
+    return 0
+
+
 def _read_password() -> str | None:
     password = os.environ.get("USER_PASSWORD")
     if password:
@@ -473,6 +543,9 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "recipients":
             return _list_recipients(conn, args)
+
+        if args.command == "agent-check":
+            return _agent_check(conn, args)
 
         if args.command == "agent-outbox":
             return _agent_outbox(conn, args)
